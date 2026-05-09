@@ -22,6 +22,7 @@ type PrismaPartnerWithNotes = Prisma.PartnerGetPayload<{
 function mapNote(note: PrismaPartnerWithNotes['notes'][number]): PartnerNote {
   return {
     ...note,
+    author: note.author ?? undefined,
     created_at: note.created_at.toISOString(),
   };
 }
@@ -29,17 +30,46 @@ function mapNote(note: PrismaPartnerWithNotes['notes'][number]): PartnerNote {
 function mapPartner(partner: PrismaPartnerWithNotes): Partner {
   return {
     ...partner,
+    contact_name: partner.contact_name ?? undefined,
+    contact_email: partner.contact_email ?? undefined,
+    contact_phone: partner.contact_phone ?? undefined,
+    contact_role: partner.contact_role ?? undefined,
+    org_website: partner.org_website ?? undefined,
+    org_address: partner.org_address ?? undefined,
+    org_city: partner.org_city ?? undefined,
+    org_state: partner.org_state ?? undefined,
+    program_structure: partner.program_structure ?? undefined,
+    who_they_work_with: partner.who_they_work_with ?? undefined,
+    youth_ages: partner.youth_ages ?? undefined,
+    how_kids_connect: partner.how_kids_connect ?? undefined,
+    intake_message: partner.intake_message ?? undefined,
+    recruitment_needed: partner.recruitment_needed ?? undefined,
+    recruitment_notes: partner.recruitment_notes ?? undefined,
+    program_times: partner.program_times ?? undefined,
+    schedule_flexibility: partner.schedule_flexibility ?? undefined,
+    desired_program_type: partner.desired_program_type ?? undefined,
+    specific_project_request: partner.specific_project_request ?? undefined,
+    desired_timeline: partner.desired_timeline ?? undefined,
+    firm_dates: partner.firm_dates ?? undefined,
+    works_with_3d_tech: (partner.works_with_3d_tech as 'yes' | 'no' | 'interested' | '') || '',
+    three_d_tech_specifics: partner.three_d_tech_specifics ?? undefined,
+    hardware_notes: partner.hardware_notes ?? undefined,
+    available_computers: partner.available_computers ?? undefined,
+    internet_availability: partner.internet_availability ?? undefined,
+    available_space: partner.available_space ?? undefined,
+    on_site_assistance_notes: partner.on_site_assistance_notes ?? undefined,
+    accessibility_limitations: partner.accessibility_limitations ?? undefined,
+    general_tech_context: partner.general_tech_context ?? undefined,
     status: partner.status as PartnerStatus,
     source: (partner.source as 'intake_form' | 'manual') || 'manual',
-    works_with_3d_tech: (partner.works_with_3d_tech as 'yes' | 'no' | 'interested' | '') || '',
-    hardware_inventory: (partner.hardware_inventory as Partner['hardware_inventory']) || [],
+    hardware_inventory: (partner.hardware_inventory as unknown as Partner['hardware_inventory']) || [],
     created_at: partner.created_at.toISOString(),
     updated_at: partner.updated_at.toISOString(),
     notes: partner.notes.map(mapNote),
   };
 }
 
-function toPrismaData(data: Partial<Partner>): Prisma.PartnerUncheckedCreateInput {
+export function toPrismaData(data: Partial<Partner>): Prisma.PartnerUncheckedCreateInput {
   return {
     org_name: data.org_name || '',
     contact_name: data.contact_name || null,
@@ -67,7 +97,7 @@ function toPrismaData(data: Partial<Partner>): Prisma.PartnerUncheckedCreateInpu
     firm_dates: data.firm_dates || null,
     works_with_3d_tech: data.works_with_3d_tech || null,
     three_d_tech_specifics: data.three_d_tech_specifics || null,
-    hardware_inventory: (data.hardware_inventory as Prisma.JsonArray) || [],
+    hardware_inventory: (data.hardware_inventory as unknown as Prisma.JsonArray) || [],
     hardware_notes: data.hardware_notes || null,
     available_computers: data.available_computers || null,
     internet_availability: data.internet_availability || null,
@@ -86,7 +116,7 @@ function toPrismaUpdateData(data: Partial<Partner>): Prisma.PartnerUncheckedUpda
     if (value === undefined) continue;
     if (key === 'id' || key === 'created_at' || key === 'updated_at' || key === 'notes') continue;
     if (key === 'hardware_inventory') {
-      out.hardware_inventory = value as Prisma.JsonArray;
+      out.hardware_inventory = value as unknown as Prisma.JsonArray;
       continue;
     }
     (out as Record<string, unknown>)[key] = value;
@@ -169,6 +199,7 @@ export async function addNote(partnerId: number, body: string, author?: string):
   });
   return {
     ...note,
+    author: note.author ?? undefined,
     created_at: note.created_at.toISOString(),
   };
 }

@@ -46,8 +46,9 @@ export default async function DashboardPage() {
             <div className="font-semibold mb-0.5">Running in mock data mode</div>
             <p className="text-ink/60">
               Set <code className="font-mono text-xs bg-ink/5 px-1.5 py-0.5 rounded">DATABASE_URL</code> in
-              your <code className="font-mono text-xs bg-ink/5 px-1.5 py-0.5 rounded">.env.local</code> to connect Neon.
-              Then run <code className="font-mono text-xs bg-ink/5 px-1.5 py-0.5 rounded">npm run db:init</code>.
+              your <code className="font-mono text-xs bg-ink/5 px-1.5 py-0.5 rounded">.env</code> to connect Neon.
+              Then run <code className="font-mono text-xs bg-ink/5 px-1.5 py-0.5 rounded">npm run db:migrate</code>
+              and <code className="font-mono text-xs bg-ink/5 px-1.5 py-0.5 rounded">npm run db:seed</code>.
             </p>
           </div>
         </div>

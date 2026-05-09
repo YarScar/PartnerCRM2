@@ -10,12 +10,13 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 const STATUSES = [
-  { label: 'New', color: '#3b82f6', sort_order: 1 },
-  { label: 'In Conversation', color: '#8b5cf6', sort_order: 2 },
-  { label: 'Pending — CreateAccess 🏀', color: '#e85d3c', sort_order: 3 },
-  { label: 'Pending — Partner', color: '#f59e0b', sort_order: 4 },
-  { label: 'Active Partner', color: '#10b981', sort_order: 5 },
-  { label: 'Not a Fit / Closed', color: '#6b7280', sort_order: 6 },
+  { label: 'Pending Intake', color: '#f43f5e', sort_order: 1 },
+  { label: 'New', color: '#3b82f6', sort_order: 2 },
+  { label: 'In Conversation', color: '#8b5cf6', sort_order: 3 },
+  { label: 'Pending — CreateAccess 🏀', color: '#e85d3c', sort_order: 4 },
+  { label: 'Pending — Partner', color: '#f59e0b', sort_order: 5 },
+  { label: 'Active Partner', color: '#10b981', sort_order: 6 },
+  { label: 'Not a Fit / Closed', color: '#6b7280', sort_order: 7 },
 ];
 
 async function main() {

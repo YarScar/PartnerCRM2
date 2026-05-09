@@ -2,17 +2,18 @@
   "name": "createaccess",
   "version": "0.1.0",
   "private": true,
+  "prisma": {
+    "seed": "tsx db/seed.ts"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:init": "prisma db push",
     "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
     "db:seed": "tsx db/seed.ts"
-  },
-  "overrides": {
-    "postcss": "8.5.14"
   },
   "dependencies": {
     "@prisma/client": "^6.8.2",

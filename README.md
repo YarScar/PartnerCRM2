@@ -30,11 +30,11 @@ Open [http://localhost:3000](http://localhost:3000). The app runs out of the box
   ```bash
   npm run db:generate
   ```
-4. Sync schema to your database:
+4. Create and apply a migration:
    ```bash
-   npm run db:init
+  npm run db:migrate
    ```
-5. (Optional) Seed default statuses:
+5. Seed default statuses, users, partners, and notes:
   ```bash
   npm run db:seed
   ```
