@@ -1,17 +1,17 @@
-import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { PrismaClient } from '@prisma/client';
 
-let _sql: NeonQueryFunction<false, false> | null = null;
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
 
-/**
- * Get a Neon SQL client. Returns null if DATABASE_URL is not configured —
- * callers should fall back to mock data in that case.
- */
-export function getDb(): NeonQueryFunction<false, false> | null {
-  if (_sql) return _sql;
-  const url = process.env.DATABASE_URL;
-  if (!url) return null;
-  _sql = neon(url);
-  return _sql;
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+  });
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma;
 }
 
 export function hasDb(): boolean {

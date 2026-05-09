@@ -1,9 +1,3 @@
-/**
- * Prisma setup script.
- * Run with: npm run db:init
- *
- * This script seeds required status rows after schema sync.
- */
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 
@@ -19,11 +13,6 @@ const STATUSES = [
 ];
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    console.error('DATABASE_URL not set.');
-    process.exit(1);
-  }
-
   for (const status of STATUSES) {
     await prisma.partnerStatus.upsert({
       where: { label: status.label },
@@ -35,7 +24,7 @@ async function main() {
     });
   }
 
-  console.log('Prisma seed/setup complete.');
+  console.log('Seed complete.');
 }
 
 main()

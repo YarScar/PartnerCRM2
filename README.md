@@ -6,7 +6,7 @@ A full-stack Next.js (App Router) application for managing youth-organization pa
 
 - **Next.js 15** (App Router) with React 19
 - **TypeScript**
-- **PostgreSQL** via [Neon](https://neon.tech) serverless driver
+- **PostgreSQL** on [Neon](https://neon.tech) via **Prisma ORM**
 - **Tailwind CSS** with a custom editorial theme (cream + ink + basketball-orange)
 - **lucide-react** icons 
 
@@ -19,18 +19,26 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). The app runs out of the box with rich mock data — no database required.
 
-## Connecting Neon
+## Connecting Neon with Prisma
 
 1. Create a database at [console.neon.tech](https://console.neon.tech)
 2. Copy your connection string into `.env.local`:
    ```
    DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
    ```
-3. Initialize the schema:
+3. Generate Prisma client:
+  ```bash
+  npm run db:generate
+  ```
+4. Sync schema to your database:
    ```bash
    npm run db:init
    ```
-4. Restart `npm run dev`. The dashboard now shows a "Connected to Neon Postgres" indicator and writes to your database.
+5. (Optional) Seed default statuses:
+  ```bash
+  npm run db:seed
+  ```
+6. Restart `npm run dev`. The dashboard now shows a "Connected to Neon Postgres" indicator and writes to your database.
 
 When `DATABASE_URL` is unset, the app transparently falls back to the in-memory mock store at `lib/mock-data.ts`.
 
@@ -50,13 +58,16 @@ components/
   HardwareChecklist.tsx    — reusable equipment-inventory input
   FormFields.tsx           — TextField, TextareaField, SelectField primitives
 lib/
-  db.ts                    — Neon client (returns null when unconfigured)
+  db.ts                    — Prisma client (returns mock mode when unconfigured)
   partners.ts              — data-access layer; switches DB ↔ mock automatically
   types.ts                 — Partner, PartnerStatus, HARDWARE_CHECKLIST, etc.
   mock-data.ts             — seed data + in-memory CRUD for prototype mode
 db/
   schema.sql               — PostgreSQL schema (partners, notes, statuses, form_config)
-  init.ts                  — runs the schema against your Neon DB
+  init.ts                  — Prisma setup helper (status upserts)
+  seed.ts                  — seeds default status labels/colors
+prisma/
+  schema.prisma            — Prisma models mapped to existing SQL tables
 ```
 
 ## Features (mapping back to your README)

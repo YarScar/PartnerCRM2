@@ -1,5 +1,5 @@
-import { getDb } from './db';
-import { Pool } from '@neondatabase/serverless';
+import { Prisma } from '@prisma/client';
+import { hasDb, prisma } from './db';
 import { Partner, PartnerNote, PartnerStatus } from './types';
 import {
   getMockPartners,
@@ -15,116 +15,142 @@ import {
  * it queries Neon; otherwise it transparently uses the in-memory mock store.
  */
 
-export async function listPartners(): Promise<Partner[]> {
-  const sql = getDb();
-  if (!sql) return getMockPartners();
+type PrismaPartnerWithNotes = Prisma.PartnerGetPayload<{
+  include: { notes: { orderBy: { created_at: 'desc' } } };
+}>;
 
-  const rows = await sql`
-    SELECT p.*,
-      COALESCE(
-        (SELECT json_agg(n ORDER BY n.created_at DESC)
-         FROM partner_notes n WHERE n.partner_id = p.id),
-        '[]'::json
-      ) AS notes
-    FROM partners p
-    ORDER BY p.updated_at DESC
-  `;
-  return rows as Partner[];
+function mapNote(note: PrismaPartnerWithNotes['notes'][number]): PartnerNote {
+  return {
+    ...note,
+    created_at: note.created_at.toISOString(),
+  };
+}
+
+function mapPartner(partner: PrismaPartnerWithNotes): Partner {
+  return {
+    ...partner,
+    status: partner.status as PartnerStatus,
+    source: (partner.source as 'intake_form' | 'manual') || 'manual',
+    works_with_3d_tech: (partner.works_with_3d_tech as 'yes' | 'no' | 'interested' | '') || '',
+    hardware_inventory: (partner.hardware_inventory as Partner['hardware_inventory']) || [],
+    created_at: partner.created_at.toISOString(),
+    updated_at: partner.updated_at.toISOString(),
+    notes: partner.notes.map(mapNote),
+  };
+}
+
+function toPrismaData(data: Partial<Partner>): Prisma.PartnerUncheckedCreateInput {
+  return {
+    org_name: data.org_name || '',
+    contact_name: data.contact_name || null,
+    contact_email: data.contact_email || null,
+    contact_phone: data.contact_phone || null,
+    contact_role: data.contact_role || null,
+    org_website: data.org_website || null,
+    org_address: data.org_address || null,
+    org_city: data.org_city || null,
+    org_state: data.org_state || null,
+    status: data.status || 'New',
+    program_structure: data.program_structure || null,
+    who_they_work_with: data.who_they_work_with || null,
+    youth_ages: data.youth_ages || null,
+    how_kids_connect: data.how_kids_connect || null,
+    intake_message: data.intake_message || null,
+    recruitment_needed: data.recruitment_needed ?? null,
+    recruitment_notes: data.recruitment_notes || null,
+    program_times: data.program_times || null,
+    schedule_flexibility: data.schedule_flexibility || null,
+    desired_program_type: data.desired_program_type || null,
+    specific_project_request: data.specific_project_request || null,
+    wants_recommendations: data.wants_recommendations ?? false,
+    desired_timeline: data.desired_timeline || null,
+    firm_dates: data.firm_dates || null,
+    works_with_3d_tech: data.works_with_3d_tech || null,
+    three_d_tech_specifics: data.three_d_tech_specifics || null,
+    hardware_inventory: (data.hardware_inventory as Prisma.JsonArray) || [],
+    hardware_notes: data.hardware_notes || null,
+    available_computers: data.available_computers || null,
+    internet_availability: data.internet_availability || null,
+    available_space: data.available_space || null,
+    on_site_assistance: data.on_site_assistance ?? null,
+    on_site_assistance_notes: data.on_site_assistance_notes || null,
+    accessibility_limitations: data.accessibility_limitations || null,
+    general_tech_context: data.general_tech_context || null,
+    source: data.source || 'manual',
+  };
+}
+
+function toPrismaUpdateData(data: Partial<Partner>): Prisma.PartnerUncheckedUpdateInput {
+  const out: Prisma.PartnerUncheckedUpdateInput = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) continue;
+    if (key === 'id' || key === 'created_at' || key === 'updated_at' || key === 'notes') continue;
+    if (key === 'hardware_inventory') {
+      out.hardware_inventory = value as Prisma.JsonArray;
+      continue;
+    }
+    (out as Record<string, unknown>)[key] = value;
+  }
+  return out;
+}
+
+export async function listPartners(): Promise<Partner[]> {
+  if (!hasDb()) return getMockPartners();
+
+  const rows = await prisma.partner.findMany({
+    orderBy: { updated_at: 'desc' },
+    include: { notes: { orderBy: { created_at: 'desc' } } },
+  });
+  return rows.map(mapPartner);
 }
 
 export async function getPartner(id: number): Promise<Partner | null> {
-  const sql = getDb();
-  if (!sql) return getMockPartner(id);
+  if (!hasDb()) return getMockPartner(id);
 
-  const rows = await sql`
-    SELECT p.*,
-      COALESCE(
-        (SELECT json_agg(n ORDER BY n.created_at DESC)
-         FROM partner_notes n WHERE n.partner_id = p.id),
-        '[]'::json
-      ) AS notes
-    FROM partners p
-    WHERE p.id = ${id}
-    LIMIT 1
-  `;
-  return (rows[0] as Partner) || null;
+  const partner = await prisma.partner.findUnique({
+    where: { id },
+    include: { notes: { orderBy: { created_at: 'desc' } } },
+  });
+  return partner ? mapPartner(partner) : null;
 }
 
 export async function createPartner(data: Partial<Partner>): Promise<Partner> {
-  const sql = getDb();
-  if (!sql) return addMockPartner(data);
+  if (!hasDb()) return addMockPartner(data);
 
-  const rows = await sql`
-    INSERT INTO partners (
-      org_name, contact_name, contact_email, contact_phone, contact_role,
-      org_website, org_city, org_state, status,
-      program_structure, who_they_work_with, youth_ages, how_kids_connect, intake_message,
-      recruitment_needed, recruitment_notes, program_times, schedule_flexibility,
-      desired_program_type, specific_project_request, wants_recommendations,
-      desired_timeline, firm_dates,
-      works_with_3d_tech, three_d_tech_specifics, hardware_inventory, hardware_notes,
-      available_computers, internet_availability, available_space,
-      on_site_assistance, on_site_assistance_notes, accessibility_limitations,
-      general_tech_context, source
-    ) VALUES (
-      ${data.org_name || ''}, ${data.contact_name || null}, ${data.contact_email || null},
-      ${data.contact_phone || null}, ${data.contact_role || null},
-      ${data.org_website || null}, ${data.org_city || null}, ${data.org_state || null},
-      ${data.status || 'New'},
-      ${data.program_structure || null}, ${data.who_they_work_with || null},
-      ${data.youth_ages || null}, ${data.how_kids_connect || null}, ${data.intake_message || null},
-      ${data.recruitment_needed ?? null}, ${data.recruitment_notes || null},
-      ${data.program_times || null}, ${data.schedule_flexibility || null},
-      ${data.desired_program_type || null}, ${data.specific_project_request || null},
-      ${data.wants_recommendations ?? false},
-      ${data.desired_timeline || null}, ${data.firm_dates || null},
-      ${data.works_with_3d_tech || null}, ${data.three_d_tech_specifics || null},
-      ${JSON.stringify(data.hardware_inventory || [])}, ${data.hardware_notes || null},
-      ${data.available_computers || null}, ${data.internet_availability || null},
-      ${data.available_space || null},
-      ${data.on_site_assistance ?? null}, ${data.on_site_assistance_notes || null},
-      ${data.accessibility_limitations || null},
-      ${data.general_tech_context || null}, ${data.source || 'manual'}
-    )
-    RETURNING *
-  `;
-  return rows[0] as Partner;
+  const created = await prisma.partner.create({
+    data: toPrismaData(data),
+    include: { notes: { orderBy: { created_at: 'desc' } } },
+  });
+  return mapPartner(created);
 }
 
 export async function updatePartner(id: number, data: Partial<Partner>): Promise<Partner | null> {
-  const sql = getDb();
-  if (!sql) return updateMockPartner(id, data);
+  if (!hasDb()) return updateMockPartner(id, data);
 
-  // Build dynamic update — only set provided fields
-  const fields = Object.entries(data).filter(
-    ([k, v]) => v !== undefined && k !== 'id' && k !== 'created_at' && k !== 'updated_at' && k !== 'notes'
-  );
-  if (fields.length === 0) return getPartner(id);
+  const updateData = toPrismaUpdateData(data);
+  if (Object.keys(updateData).length === 0) return getPartner(id);
 
-  // Use Pool for parameterized text queries (neon() tagged template can't do dynamic SET clauses)
-  const url = process.env.DATABASE_URL!;
-  const pool = new Pool({ connectionString: url });
   try {
-    const setClauses = fields.map(([k], i) => `${k} = $${i + 1}`);
-    const values = fields.map(([k, v]) => {
-      if (k === 'hardware_inventory') return JSON.stringify(v);
-      return v;
+    const updated = await prisma.partner.update({
+      where: { id },
+      data: updateData,
+      include: { notes: { orderBy: { created_at: 'desc' } } },
     });
-
-    const query = `UPDATE partners SET ${setClauses.join(', ')} WHERE id = $${fields.length + 1} RETURNING *`;
-    const result = await pool.query(query, [...values, id]);
-    return (result.rows[0] as Partner) || null;
-  } finally {
-    await pool.end();
+    return mapPartner(updated);
+  } catch {
+    return null;
   }
 }
 
 export async function deletePartner(id: number): Promise<boolean> {
-  const sql = getDb();
-  if (!sql) return deleteMockPartner(id);
+  if (!hasDb()) return deleteMockPartner(id);
 
-  const rows = await sql`DELETE FROM partners WHERE id = ${id} RETURNING id`;
-  return rows.length > 0;
+  try {
+    await prisma.partner.delete({ where: { id } });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function updatePartnerStatus(id: number, status: PartnerStatus): Promise<Partner | null> {
@@ -132,13 +158,17 @@ export async function updatePartnerStatus(id: number, status: PartnerStatus): Pr
 }
 
 export async function addNote(partnerId: number, body: string, author?: string): Promise<PartnerNote> {
-  const sql = getDb();
-  if (!sql) return addMockNote(partnerId, body, author);
+  if (!hasDb()) return addMockNote(partnerId, body, author);
 
-  const rows = await sql`
-    INSERT INTO partner_notes (partner_id, body, author)
-    VALUES (${partnerId}, ${body}, ${author || null})
-    RETURNING *
-  `;
-  return rows[0] as PartnerNote;
+  const note = await prisma.partnerNote.create({
+    data: {
+      partner_id: partnerId,
+      body,
+      author: author || null,
+    },
+  });
+  return {
+    ...note,
+    created_at: note.created_at.toISOString(),
+  };
 }
