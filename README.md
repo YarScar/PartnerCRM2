@@ -8,7 +8,7 @@ A full-stack Next.js (App Router) application for managing youth-organization pa
 - **TypeScript**
 - **PostgreSQL** via [Neon](https://neon.tech) serverless driver
 - **Tailwind CSS** with a custom editorial theme (cream + ink + basketball-orange)
-- **lucide-react** icons
+- **lucide-react** icons 
 
 ## Quick start
 
