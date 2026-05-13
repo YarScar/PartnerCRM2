@@ -1,5 +1,5 @@
 -- CreateTable Partner
-CREATE TABLE IF NOT EXISTS "partners" (
+CREATE TABLE "partners" (
     "id" SERIAL NOT NULL PRIMARY KEY,
     "org_name" TEXT NOT NULL,
     "contact_name" TEXT,
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS "partners" (
 );
 
 -- CreateTable PartnerStatus
-CREATE TABLE IF NOT EXISTS "partner_statuses" (
+CREATE TABLE "partner_statuses" (
     "id" SERIAL NOT NULL PRIMARY KEY,
     "label" TEXT NOT NULL UNIQUE,
     "color" TEXT NOT NULL,
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS "partner_statuses" (
 );
 
 -- CreateTable PartnerNote
-CREATE TABLE IF NOT EXISTS "partner_notes" (
+CREATE TABLE "partner_notes" (
     "id" SERIAL NOT NULL PRIMARY KEY,
     "partner_id" INTEGER NOT NULL,
     "body" TEXT NOT NULL,
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS "partner_notes" (
 );
 
 -- CreateTable User
-CREATE TABLE IF NOT EXISTS "users" (
+CREATE TABLE "users" (
     "id" SERIAL NOT NULL PRIMARY KEY,
     "username" TEXT NOT NULL UNIQUE,
     "password_hash" TEXT NOT NULL,
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS "users" (
 );
 
 -- CreateTable FormConfig
-CREATE TABLE IF NOT EXISTS "form_config" (
+CREATE TABLE "form_config" (
     "id" SERIAL NOT NULL PRIMARY KEY,
     "section_key" TEXT NOT NULL,
     "section_label" TEXT NOT NULL,

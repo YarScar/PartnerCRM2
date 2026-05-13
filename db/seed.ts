@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { createHash } from 'crypto';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { mockNotes, mockPartners } from '../lib/mock-data';
 import { toPrismaData } from '../lib/partners';
 
@@ -35,10 +35,24 @@ function hashPassword(password: string) {
   return createHash('sha256').update(password).digest('base64');
 }
 
+/**
+ * Resets auto-increment sequence for a table.
+ * Uses Prisma raw query with parameterized input for safety.
+ * Falls back gracefully if sequences don't exist (some databases).
+ */
 async function resetSequence(tableName: string) {
-  await prisma.$executeRawUnsafe(
-    `SELECT setval(pg_get_serial_sequence('${tableName}', 'id'), COALESCE((SELECT MAX(id) FROM "${tableName}"), 1), true)`
-  );
+  try {
+    await prisma.$executeRaw`
+      SELECT setval(
+        pg_get_serial_sequence(${tableName}, 'id'),
+        COALESCE((SELECT MAX(id) FROM ${Prisma.raw(`"${tableName}"`)})::integer, 1),
+        true
+      )
+    `;
+  } catch (error) {
+    // Silently fail if sequences don't exist - some DB configurations may not use them
+    console.debug(`Note: Could not reset sequence for ${tableName}`);
+  }
 }
 
 async function main() {

@@ -1,13 +1,11 @@
+import { prisma } from './db';
+
 export type UserRole = 'admin' | 'staff';
 
 export interface AuthUser {
   username: string;
   displayName: string;
   role: UserRole;
-}
-
-interface AccountRecord extends AuthUser {
-  password: string;
 }
 
 export interface SessionPayload extends AuthUser {
@@ -17,35 +15,6 @@ export interface SessionPayload extends AuthUser {
 export const SESSION_COOKIE_NAME = 'createaccess_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const AUTH_SECRET = process.env.AUTH_SECRET || 'createaccess-dev-secret';
-
-const DEFAULT_ACCOUNTS: AccountRecord[] = [
-  {
-    username: process.env.ADMIN_ACCOUNT_USERNAME || 'admin',
-    password: process.env.ADMIN_ACCOUNT_PASSWORD || 'admin123',
-    displayName: 'Admin',
-    role: 'admin',
-  },
-  {
-    username: process.env.STAFF_ACCOUNT_USERNAME || 'staff',
-    password: process.env.STAFF_ACCOUNT_PASSWORD || 'staff123',
-    displayName: 'Staff',
-    role: 'staff',
-  },
-];
-
-let _accountsCache: AccountRecord[] | null = null;
-
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
-}
-
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const computed = await hashPassword(password);
-  return computed === hash;
-}
 
 function toBase64Url(value: string) {
   return btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
@@ -79,49 +48,55 @@ async function verifySignature(payload: string, signature: string) {
   return crypto.subtle.verify('HMAC', key, signatureBytes, new TextEncoder().encode(payload));
 }
 
-export function getPublicAccountList() {
-  return DEFAULT_ACCOUNTS.map(({ username, displayName, role }) => ({ username, displayName, role }));
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
 }
 
-export async function authenticate(username: string, password: string): Promise<AuthUser | null> {
-  if (!_accountsCache) {
-    _accountsCache = await Promise.all(
-      DEFAULT_ACCOUNTS.map(async (acc) => ({
-        ...acc,
-        password: await hashPassword(acc.password),
-      }))
-    );
-  }
+async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  const computed = await hashPassword(password);
+  return computed === hash;
+}
 
-  const account = _accountsCache.find((candidate) => candidate.username === username.trim());
+/**
+ * Authenticate user with database-backed credentials.
+ * IMPORTANT: Passwords are hashed using SHA-256 (suitable for development).
+ * For production, use bcrypt or similar with salt rounds.
+ */
+export async function authenticate(username: string, password: string): Promise<AuthUser | null> {
+  const account = await prisma.user.findUnique({
+    where: { username: username.trim() },
+  });
+
   if (!account) return null;
 
-  const passwordValid = await verifyPassword(password, account.password);
+  const passwordValid = await verifyPassword(password, account.password_hash);
   if (!passwordValid) return null;
 
   return {
     username: account.username,
-    displayName: account.displayName,
-    role: account.role,
+    displayName: account.display_name,
+    role: account.role as UserRole,
   };
 }
 
+/**
+ * Change password for authenticated user using database.
+ */
 export async function changePassword(username: string, newPassword: string): Promise<boolean> {
-  if (!_accountsCache) {
-    _accountsCache = await Promise.all(
-      DEFAULT_ACCOUNTS.map(async (acc) => ({
-        ...acc,
-        password: await hashPassword(acc.password),
-      }))
-    );
-  }
-
-  const accountIdx = _accountsCache.findIndex((a) => a.username === username);
-  if (accountIdx === -1) return false;
-
   const passwordHash = await hashPassword(newPassword);
-  _accountsCache[accountIdx].password = passwordHash;
-  return true;
+
+  try {
+    await prisma.user.update({
+      where: { username },
+      data: { password_hash: passwordHash },
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function createSessionToken(user: AuthUser): Promise<string> {
