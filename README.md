@@ -4,7 +4,7 @@ A full-stack Next.js (App Router) application for managing youth-organization pa
 
 ## Stack
 
-- **Next.js 15** (App Router) with React 19
+- **Next.js 16** (App Router) with React 19
 - **TypeScript**
 - **PostgreSQL** on [Neon](https://neon.tech) via **Prisma ORM**
 - **Tailwind CSS** with a custom editorial theme (cream + ink + basketball-orange)
@@ -75,7 +75,7 @@ prisma/
 - **Section 3 — Program Info:** all fields captured (program structure, who they work with, how kids connect, recruitment, schedule, desired program type, recommendations preference, timeline, firm dates).
 - **Section 4 — Tech + Space:** 3D tech, structured hardware checklist with quantities, computer/internet/space context, on-site assistance, accessibility limitations, broader tech context.
 - **Public intake form** (`/intake`): all the new fields per README so staff can assess feasibility upfront.
-- **Status workflow:** 6-state canonical list (`New` → `In Conversation` → `Pending — CreateAccess 🏀` → `Pending — Partner` → `Active Partner` → `Not a Fit / Closed`) with one-click status changes on the partner detail page.
+- **Status workflow:** 7-status canonical list (`Pending Intake` → `New` → `In Conversation` → `Pending — CreateAccess 🏀` → `Pending — Partner` → `Active Partner` → `Not a Fit / Closed`) with one-click status changes on the partner detail page.
 - **Conversation log:** each partner has notes with author + timestamp; staff can append from the detail view.
 - **Partnership readiness assessment:** the detail view surfaces program type, timeline, hardware, space, and limitations side-by-side for fast meeting prep.
 - **Account login:** staff and admin accounts sign in before opening the internal workspace; the nav stays hidden until a session exists.
@@ -85,7 +85,7 @@ prisma/
 ## Next steps
 
 - Wire admin configurator changes to the `form_config` table (schema is already there).
-- Add authentication (NextAuth or Clerk) — currently anyone can edit anything.
+- Upgrade authentication hardening for production (the current app already uses a lightweight custom login/session flow).
 - Add file uploads for partner documents (Neon doesn't store files; pair with S3 or Vercel Blob).
 - Email notifications when intake forms come in.
 - Export to CSV.
