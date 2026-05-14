@@ -1,24 +1,107 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Partner, PARTNER_STATUSES, PROGRAM_TYPES } from '@/lib/types';
 import { TextField, TextareaField, SelectField } from '@/components/FormFields';
 import { HardwareChecklist } from '@/components/HardwareChecklist';
+import { DynamicChecklist } from '@/components/DynamicChecklist';
 import { Save, Loader2, Building2, Users, Cpu, HardDrive } from 'lucide-react';
+
+interface FormField {
+  id: string;
+  label: string;
+  type: 'text' | 'textarea' | 'select' | 'boolean' | 'checklist';
+  visible: boolean;
+  required: boolean;
+  options?: string[];
+}
+
+interface FormSection {
+  id: string;
+  label: string;
+  fields: FormField[];
+}
 
 interface Props {
   partner?: Partner;
   mode: 'create' | 'edit' | 'intake';
 }
 
+const DEFAULT_CONFIG: FormSection[] = [
+  {
+    id: 'org',
+    label: 'Organization & Contact',
+    fields: [
+      { id: 'org_name', label: 'Organization Name', type: 'text', visible: true, required: true },
+      { id: 'contact_name', label: 'Contact Name', type: 'text', visible: true, required: false },
+      { id: 'contact_email', label: 'Contact Email', type: 'text', visible: true, required: false },
+      { id: 'contact_phone', label: 'Contact Phone', type: 'text', visible: true, required: false },
+      { id: 'org_website', label: 'Website', type: 'text', visible: true, required: false },
+    ],
+  },
+  {
+    id: 'program',
+    label: 'Program & Approach',
+    fields: [
+      { id: 'program_structure', label: 'Program Structure', type: 'textarea', visible: true, required: false },
+      { id: 'youth_ages', label: 'Youth Ages', type: 'text', visible: true, required: false },
+      { id: 'how_kids_connect', label: 'How Kids Connect', type: 'text', visible: true, required: false },
+      { id: 'recruitment_needed', label: 'Recruitment Needed', type: 'boolean', visible: true, required: false },
+    ],
+  },
+  {
+    id: 'request',
+    label: "What They're Looking For",
+    fields: [
+      { id: 'desired_program_type', label: 'Desired Program Type', type: 'select', visible: true, required: false },
+      { id: 'specific_project_request', label: 'Specific Project', type: 'textarea', visible: true, required: false },
+      { id: 'wants_recommendations', label: 'Open to Recommendations', type: 'boolean', visible: true, required: false },
+      { id: 'desired_timeline', label: 'Desired Timeline', type: 'text', visible: true, required: false },
+      { id: 'firm_dates', label: 'Firm Dates', type: 'text', visible: true, required: false },
+    ],
+  },
+  {
+    id: 'tech',
+    label: 'Tech & Space',
+    fields: [
+      { id: 'works_with_3d_tech', label: 'Works with 3D Tech', type: 'select', visible: true, required: false },
+      { id: 'hardware_inventory', label: 'Hardware Inventory', type: 'checklist', visible: true, required: false },
+      { id: 'available_computers', label: 'Available Computers', type: 'text', visible: true, required: false },
+      { id: 'internet_availability', label: 'Internet / WiFi', type: 'select', visible: true, required: false },
+      { id: 'available_space', label: 'Available Space', type: 'textarea', visible: true, required: false },
+      { id: 'on_site_assistance', label: 'On-Site Assistance', type: 'boolean', visible: true, required: false },
+    ],
+  },
+];
+
+const STORAGE_KEY = 'createaccess.formConfig';
+
 export function PartnerForm({ partner, mode }: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [config, setConfig] = useState<FormSection[]>(DEFAULT_CONFIG);
 
   const isIntake = mode === 'intake';
+
+  // Load form config from database
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const res = await fetch('/api/form-config');
+        if (res.ok) {
+          const data = await res.json();
+          setConfig(data);
+        }
+      } catch (err) {
+        console.error('Failed to load form config:', err);
+        // Fall back to default
+      }
+    };
+    loadConfig();
+  }, []);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -92,66 +175,113 @@ export function PartnerForm({ partner, mode }: Props) {
     );
   }
 
+  // Helper function to get partner value by field id
+  const getFieldValue = (fieldId: string): any => {
+    const key = fieldId as keyof Partner;
+    return partner?.[key] ?? '';
+  };
+
+  // Helper function to render field based on type
+  const renderField = (field: FormField, sectionNumber: string) => {
+    if (!field.visible) return null;
+
+    const commonProps = {
+      label: field.label,
+      name: field.id,
+      required: field.required,
+      defaultValue: getFieldValue(field.id),
+    };
+
+    switch (field.type) {
+      case 'text':
+        return (
+          <TextField
+            key={field.id}
+            {...commonProps}
+            placeholder={field.label}
+          />
+        );
+      case 'textarea':
+        return (
+          <TextareaField
+            key={field.id}
+            {...commonProps}
+            placeholder={field.label}
+            rows={2}
+          />
+        );
+      case 'boolean':
+        return (
+          <SelectField
+            key={field.id}
+            {...commonProps}
+            options={[
+              { value: 'true', label: 'Yes' },
+              { value: 'false', label: 'No' },
+            ]}
+            placeholder="Select..."
+          />
+        );
+      case 'select':
+        let options: readonly string[] | { value: string; label: string }[] = [];
+        if (field.id === 'desired_program_type') {
+          options = PROGRAM_TYPES;
+        } else if (field.id === 'works_with_3d_tech') {
+          options = [
+            { value: 'yes', label: 'Yes' },
+            { value: 'no', label: 'No' },
+            { value: 'interested', label: 'Interested but not yet' },
+          ];
+        } else if (field.id === 'internet_availability') {
+          options = [
+            'Reliable WiFi throughout',
+            'WiFi available but inconsistent',
+            'Limited internet access',
+            'No internet',
+          ];
+        } else if (field.options) {
+          options = field.options;
+        }
+        return (
+          <SelectField
+            key={field.id}
+            {...commonProps}
+            options={options}
+            placeholder="Select..."
+          />
+        );
+      case 'checklist':
+        if (field.id === 'hardware_inventory') {
+          return (
+            <div key={field.id}>
+              <label className="label-base">{field.label}</label>
+              <p className="text-xs text-ink/50 mb-3">
+                Tap to select equipment you have on-site, then specify quantities and notes.
+              </p>
+              <HardwareChecklist
+                name={field.id}
+                defaultValue={partner?.hardware_inventory || []}
+              />
+            </div>
+          );
+        }
+        return (
+          <DynamicChecklist
+            key={field.id}
+            name={field.id}
+            label={field.label}
+            options={field.options || []}
+            defaultValue={getFieldValue(field.id)}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      {/* Section 1: Org & Contact */}
-      <FormSection number="01" title="Organization & Contact" icon={Building2}>
-        <div className="grid md:grid-cols-2 gap-4">
-          <TextField
-            label="Organization Name"
-            name="org_name"
-            required
-            defaultValue={partner?.org_name}
-            placeholder="Roxbury Youth Collective"
-          />
-          <TextField
-            label="Website"
-            name="org_website"
-            type="url"
-            defaultValue={partner?.org_website}
-            placeholder="https://..."
-          />
-          <TextField
-            label="Primary Contact Name"
-            name="contact_name"
-            defaultValue={partner?.contact_name}
-            placeholder="Full name"
-          />
-          <TextField
-            label="Contact Role / Title"
-            name="contact_role"
-            defaultValue={partner?.contact_role}
-            placeholder="Program Director"
-          />
-          <TextField
-            label="Contact Email"
-            name="contact_email"
-            type="email"
-            defaultValue={partner?.contact_email}
-            placeholder="name@org.org"
-          />
-          <TextField
-            label="Contact Phone"
-            name="contact_phone"
-            type="tel"
-            defaultValue={partner?.contact_phone}
-            placeholder="(555) 555-5555"
-          />
-          <TextField
-            label="City"
-            name="org_city"
-            defaultValue={partner?.org_city}
-          />
-          <TextField
-            label="State"
-            name="org_state"
-            defaultValue={partner?.org_state}
-            placeholder="MA"
-          />
-        </div>
-      </FormSection>
-
-      {/* Section 2: Status (not on intake form) */}
+      {/* Status section for non-intake forms */}
       {!isIntake && (
         <FormSection number="02" title="Status">
           <SelectField
@@ -164,211 +294,23 @@ export function PartnerForm({ partner, mode }: Props) {
         </FormSection>
       )}
 
-      {/* Section 3: Program info */}
-      <FormSection number={isIntake ? '02' : '03'} title="Program & Approach" icon={Users}>
-        <div className="space-y-4">
-          <TextareaField
-            label="Program Structure"
-            name="program_structure"
-            defaultValue={partner?.program_structure}
-            placeholder="Describe your programming — when, where, format..."
-            rows={3}
-          />
-          <div className="grid md:grid-cols-2 gap-4">
-            <TextareaField
-              label="Who You Work With"
-              name="who_they_work_with"
-              defaultValue={partner?.who_they_work_with}
-              placeholder="Demographics, community context..."
-              rows={2}
-            />
-            <TextField
-              label="Youth Ages"
-              name="youth_ages"
-              defaultValue={partner?.youth_ages}
-              placeholder="11-18"
-            />
-            <TextField
-              label="How Kids Connect with the Program"
-              name="how_kids_connect"
-              defaultValue={partner?.how_kids_connect}
-              placeholder="Open enrollment, referral, recruitment..."
-            />
-            <SelectField
-              label="Do Kids Need to Be Recruited?"
-              name="recruitment_needed"
-              options={[
-                { value: 'true', label: 'Yes' },
-                { value: 'false', label: 'No' },
-              ]}
-              defaultValue={
-                partner?.recruitment_needed === true ? 'true' :
-                partner?.recruitment_needed === false ? 'false' : ''
-              }
-              placeholder="Select..."
-            />
-            <TextField
-              label="Program Times / Schedule"
-              name="program_times"
-              defaultValue={partner?.program_times}
-              placeholder="Mon-Thu 3-6pm"
-            />
-            <TextField
-              label="Schedule Flexibility"
-              name="schedule_flexibility"
-              defaultValue={partner?.schedule_flexibility}
-              placeholder="Flexible / Limited / etc."
-            />
-          </div>
-        </div>
-      </FormSection>
+      {/* Dynamic sections from config */}
+      {config.map((section, index) => {
+        const visibleFields = section.fields.filter(f => f.visible);
+        if (visibleFields.length === 0) return null;
 
-      {/* What they want */}
-      <FormSection number={isIntake ? '03' : '04'} title="What You're Looking For" icon={Cpu}>
-        <div className="space-y-4">
-          <SelectField
-            label="Desired Program Type"
-            name="desired_program_type"
-            options={PROGRAM_TYPES}
-            defaultValue={partner?.desired_program_type}
-            placeholder="Select a focus..."
-          />
-          <TextareaField
-            label="Specific Project Request"
-            name="specific_project_request"
-            defaultValue={partner?.specific_project_request}
-            placeholder="Event support, workshop, showcase, custom activity..."
-            rows={2}
-          />
-          <SelectField
-            label="Open to CreateAccess Recommendations?"
-            name="wants_recommendations"
-            options={[
-              { value: 'true', label: 'Yes — open to ideas' },
-              { value: 'false', label: 'No — we have a specific request' },
-            ]}
-            defaultValue={
-              partner?.wants_recommendations === true ? 'true' :
-              partner?.wants_recommendations === false ? 'false' : ''
-            }
-            placeholder="Select..."
-            hint="Some partners just want 'something cool' for students and need ideas."
-          />
-          <div className="grid md:grid-cols-2 gap-4">
-            <TextField
-              label="Desired Timeline"
-              name="desired_timeline"
-              defaultValue={partner?.desired_timeline}
-              placeholder="Fall 2026, Summer only, Flexible..."
-            />
-            <TextField
-              label="Firm Dates or Upcoming Events"
-              name="firm_dates"
-              defaultValue={partner?.firm_dates}
-              placeholder="Showcase: April 25, 2026"
-            />
-          </div>
-        </div>
-      </FormSection>
+        const sectionNumber = isIntake 
+          ? String(index + 1).padStart(2, '0')
+          : String(index + 2).padStart(2, '0');
 
-      {/* Tech & Space */}
-      <FormSection number={isIntake ? '04' : '05'} title="Tech & Space" icon={HardDrive}>
-        <div className="space-y-4">
-          <SelectField
-            label="Do You Work with 3D Tech?"
-            name="works_with_3d_tech"
-            options={[
-              { value: 'yes', label: 'Yes' },
-              { value: 'no', label: 'No' },
-              { value: 'interested', label: 'Interested but not yet' },
-            ]}
-            defaultValue={partner?.works_with_3d_tech}
-            placeholder="Select..."
-          />
-          <TextareaField
-            label="3D Tech Specifics"
-            name="three_d_tech_specifics"
-            defaultValue={partner?.three_d_tech_specifics}
-            placeholder="Printers, scanners, CAD software, student experience level..."
-            rows={2}
-          />
-
-          <div>
-            <label className="label-base">Hardware Inventory</label>
-            <p className="text-xs text-ink/50 mb-3">
-              Tap to select equipment you have on-site, then specify quantities and notes.
-            </p>
-            <HardwareChecklist
-              name="hardware_inventory"
-              defaultValue={partner?.hardware_inventory || []}
-            />
-          </div>
-
-          <TextareaField
-            label="Hardware Notes"
-            name="hardware_notes"
-            defaultValue={partner?.hardware_notes}
-            placeholder="Device quality, age, limitations..."
-            rows={2}
-          />
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <TextField
-              label="Available Computers"
-              name="available_computers"
-              defaultValue={partner?.available_computers}
-              placeholder="12 Chromebooks, 2 desktops..."
-            />
-            <SelectField
-              label="Internet / WiFi"
-              name="internet_availability"
-              options={[
-                'Reliable WiFi throughout',
-                'WiFi available but inconsistent',
-                'Limited internet access',
-                'No internet',
-              ]}
-              defaultValue={partner?.internet_availability}
-              placeholder="Select..."
-            />
-            <TextareaField
-              label="Available Space / Lab Setup"
-              name="available_space"
-              defaultValue={partner?.available_space}
-              placeholder="Classroom, lab, makerspace, open room..."
-              rows={2}
-            />
-            <SelectField
-              label="On-Site Assistance Available?"
-              name="on_site_assistance"
-              options={[
-                { value: 'true', label: 'Yes' },
-                { value: 'false', label: 'No' },
-              ]}
-              defaultValue={
-                partner?.on_site_assistance === true ? 'true' :
-                partner?.on_site_assistance === false ? 'false' : ''
-              }
-              placeholder="Select..."
-            />
-          </div>
-
-          <TextareaField
-            label="Accessibility / Logistical Limitations"
-            name="accessibility_limitations"
-            defaultValue={partner?.accessibility_limitations}
-            placeholder="Transportation, supervision, scheduling constraints..."
-            rows={2}
-          />
-          <TextareaField
-            label="General Tech Context"
-            name="general_tech_context"
-            defaultValue={partner?.general_tech_context}
-            placeholder="Broader tech context beyond 3D..."
-            rows={2}
-          />
-        </div>
-      </FormSection>
+        return (
+          <FormSection key={section.id} number={sectionNumber} title={section.label}>
+            <div className="space-y-4">
+              {visibleFields.map(field => renderField(field, sectionNumber))}
+            </div>
+          </FormSection>
+        );
+      })}
 
       {error && (
         <div className="bg-court/10 border border-court/30 text-court-deep rounded-lg p-3 text-sm">

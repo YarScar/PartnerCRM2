@@ -65,30 +65,91 @@ const DEFAULT_CONFIG: FormSection[] = [
   },
 ];
 
-const STORAGE_KEY = 'createaccess.formConfig';
-
 export default function AdminPage() {
   const [config, setConfig] = useState<FormSection[]>(DEFAULT_CONFIG);
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [draggingField, setDraggingField] = useState<{ sectionId: string; fieldId: string } | null>(null);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) setConfig(JSON.parse(stored));
-    } catch {}
+    const loadConfig = async () => {
+      try {
+        const res = await fetch('/api/form-config');
+        if (res.ok) {
+          const data = await res.json();
+          setConfig(data);
+        }
+      } catch (err) {
+        console.error('Failed to load form config:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadConfig();
   }, []);
 
-  const save = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const save = async () => {
+    try {
+      const orderedConfig = config.map((section, sectionIndex) => ({
+        ...section,
+        fields: section.fields.map((field, fieldIndex) => ({
+          ...field,
+          sort_order: sectionIndex * 100 + fieldIndex,
+        })),
+      }));
+
+      const res = await fetch('/api/form-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderedConfig),
+      });
+      if (res.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
+    } catch (err) {
+      console.error('Failed to save form config:', err);
+    }
   };
 
-  const reset = () => {
+  const reset = async () => {
     if (confirm('Reset to default form configuration?')) {
       setConfig(DEFAULT_CONFIG);
-      localStorage.removeItem(STORAGE_KEY);
+      try {
+        const orderedDefaults = DEFAULT_CONFIG.map((section, sectionIndex) => ({
+          ...section,
+          fields: section.fields.map((field, fieldIndex) => ({
+            ...field,
+            sort_order: sectionIndex * 100 + fieldIndex,
+          })),
+        }));
+
+        await fetch('/api/form-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderedDefaults),
+        });
+      } catch (err) {
+        console.error('Failed to reset form config:', err);
+      }
     }
+  };
+
+  const moveField = (sectionId: string, sourceFieldId: string, targetFieldId: string) => {
+    setConfig((current) =>
+      current.map((section) => {
+        if (section.id !== sectionId) return section;
+
+        const sourceIndex = section.fields.findIndex((field) => field.id === sourceFieldId);
+        const targetIndex = section.fields.findIndex((field) => field.id === targetFieldId);
+        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return section;
+
+        const nextFields = [...section.fields];
+        const [moved] = nextFields.splice(sourceIndex, 1);
+        nextFields.splice(targetIndex, 0, moved);
+        return { ...section, fields: nextFields };
+      })
+    );
   };
 
   const updateField = (sectionId: string, fieldId: string, patch: Partial<FormField>) => {
@@ -135,6 +196,53 @@ export default function AdminPage() {
     setConfig([...config, { id, label, fields: [] }]);
   };
 
+  const editFieldOptions = (sectionId: string, fieldId: string) => {
+    const section = config.find(s => s.id === sectionId);
+    if (!section) return;
+    const field = section.fields.find(f => f.id === fieldId);
+    if (!field) return;
+    
+    const currentOptions = (field.options || []).join('\n');
+    const newOptions = prompt('Enter options, one per line:', currentOptions);
+    if (newOptions === null) return;
+    
+    const optionsArray = newOptions.split('\n').filter(o => o.trim()).map(o => o.trim());
+    updateField(sectionId, fieldId, { options: optionsArray });
+  };
+
+  const addFieldOption = (sectionId: string, fieldId: string) => {
+    const label = prompt('New option label:');
+    if (!label?.trim()) return;
+
+    const section = config.find((s) => s.id === sectionId);
+    const field = section?.fields.find((f) => f.id === fieldId);
+    if (!field) return;
+
+    updateField(sectionId, fieldId, {
+      options: [...(field.options || []), label.trim()],
+    });
+  };
+
+  const updateFieldOption = (sectionId: string, fieldId: string, optionIndex: number, value: string) => {
+    const section = config.find((s) => s.id === sectionId);
+    const field = section?.fields.find((f) => f.id === fieldId);
+    if (!field) return;
+
+    const nextOptions = [...(field.options || [])];
+    nextOptions[optionIndex] = value;
+    updateField(sectionId, fieldId, { options: nextOptions.filter(Boolean) });
+  };
+
+  const removeFieldOption = (sectionId: string, fieldId: string, optionIndex: number) => {
+    const section = config.find((s) => s.id === sectionId);
+    const field = section?.fields.find((f) => f.id === fieldId);
+    if (!field) return;
+
+    updateField(sectionId, fieldId, {
+      options: (field.options || []).filter((_, index) => index !== optionIndex),
+    });
+  };
+
   const removeSection = (sectionId: string) => {
     if (confirm('Remove this entire section and its fields?')) {
       setConfig(config.filter((s) => s.id !== sectionId));
@@ -164,14 +272,17 @@ export default function AdminPage() {
       </div>
       <p className="text-ink/60 mb-10 max-w-2xl">
         Customize what fields appear on the partner intake form. Toggle visibility, mark fields as required,
-        rename labels, or add new fields. Changes save to local storage in this prototype — wire to the{' '}
-        <code className="text-xs bg-ink/5 px-1 py-0.5 rounded font-mono">form_config</code> table for production.
+        rename labels, or add new fields. Changes save to the database.
       </p>
 
       <div className="space-y-4">
-        {config.map((section) => (
-          <div key={section.id} className="card !p-0 overflow-hidden">
-            <div className="flex items-center justify-between bg-ink/5 px-5 py-3 border-b border-ink/10">
+        {loading ? (
+          <div className="text-center py-10 text-ink/50">Loading form configuration...</div>
+        ) : (
+          <>
+            {config.map((section) => (
+              <div key={section.id} className="card !p-0 overflow-hidden">
+                <div className="flex items-center justify-between bg-ink/5 px-5 py-3 border-b border-ink/10">
               <input
                 type="text"
                 value={section.label}
@@ -207,11 +318,31 @@ export default function AdminPage() {
                 section.fields.map((field) => (
                   <div
                     key={field.id}
+                    draggable
+                    onDragStart={() => setDraggingField({ sectionId: section.id, fieldId: field.id })}
+                    onDragEnd={() => setDraggingField(null)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => {
+                      if (!draggingField) return;
+                      moveField(section.id, draggingField.fieldId, field.id);
+                      setDraggingField(null);
+                    }}
                     className={`flex items-center gap-3 px-5 py-3 ${
                       !field.visible ? 'opacity-50' : ''
+                    } ${
+                      draggingField?.sectionId === section.id && draggingField?.fieldId === field.id
+                        ? 'bg-court/10'
+                        : ''
                     }`}
                   >
-                    <GripVertical size={14} className="text-ink/30" />
+                    <button
+                      type="button"
+                      onMouseDown={() => setDraggingField({ sectionId: section.id, fieldId: field.id })}
+                      className="cursor-grab active:cursor-grabbing text-ink/30"
+                      aria-label="Drag to reorder"
+                    >
+                      <GripVertical size={14} />
+                    </button>
                     <input
                       type="text"
                       value={field.label}
@@ -235,6 +366,38 @@ export default function AdminPage() {
                       <option value="boolean">Yes/No</option>
                       <option value="checklist">Checklist</option>
                     </select>
+                    {(field.type === 'select' || field.type === 'checklist') && (
+                      <div className="ml-auto w-72 space-y-2">
+                        {(field.options || []).map((option, optionIndex) => (
+                          <div key={`${field.id}-${optionIndex}`} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={option}
+                              onChange={(e) =>
+                                updateFieldOption(section.id, field.id, optionIndex, e.target.value)
+                              }
+                              className="flex-1 text-xs bg-cream-soft border border-ink/15 rounded px-2 py-1"
+                              placeholder="Option label"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeFieldOption(section.id, field.id, optionIndex)}
+                              className="text-ink/40 hover:text-court p-1"
+                              title="Remove item"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => addFieldOption(section.id, field.id)}
+                          className="text-xs text-court-deep hover:text-court font-medium"
+                        >
+                          + Add item
+                        </button>
+                      </div>
+                    )}
                     <label className="flex items-center gap-1.5 text-xs text-ink/60">
                       <input
                         type="checkbox"
@@ -274,6 +437,8 @@ export default function AdminPage() {
         >
           <Plus size={16} /> Add Section
         </button>
+          </>
+        )}
       </div>
     </div>
   );
