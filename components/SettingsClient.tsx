@@ -11,6 +11,9 @@ export function SettingsClient({ user }: { user: any }) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [displayName, setDisplayName] = useState(user.displayName || '');
+  const [profileSubmitting, setProfileSubmitting] = useState(false);
+  const [profileSuccess, setProfileSuccess] = useState(false);
 
   const handleChangePassword = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -85,7 +88,42 @@ export function SettingsClient({ user }: { user: any }) {
 
             <div className="space-y-2">
               <div className="text-xs uppercase tracking-widest text-ink/50">Display Name</div>
-              <div className="text-sm font-medium">{user.displayName}</div>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setProfileSubmitting(true);
+                setProfileSuccess(false);
+                try {
+                  const res = await fetch('/api/account/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ displayName }),
+                  });
+                  if (!res.ok) {
+                    const body = await res.json().catch(() => ({}));
+                    setError(body.error || 'Failed to update profile');
+                    setProfileSubmitting(false);
+                    return;
+                  }
+                  setProfileSuccess(true);
+                } catch (err: any) {
+                  setError(err.message || 'Failed to update profile');
+                } finally {
+                  setProfileSubmitting(false);
+                }
+              }}>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  className="input-base"
+                />
+                <div className="mt-2">
+                  <button type="submit" className="btn-secondary" disabled={profileSubmitting}>
+                    {profileSubmitting ? 'Saving...' : 'Save'}
+                  </button>
+                  {profileSuccess && <span className="text-emerald-700 ml-3">Saved</span>}
+                </div>
+              </form>
             </div>
 
             <div className="space-y-2">
