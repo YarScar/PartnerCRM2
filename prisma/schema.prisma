@@ -80,6 +80,7 @@ model PartnerNote {
 model User {
   id            Int      @id @default(autoincrement())
   username      String   @unique
+  email         String?  @unique
   password_hash String
   display_name  String
   role          String   @default("staff")

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Loader2, Lock, UserRound } from 'lucide-react';
 
@@ -71,6 +72,10 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
           />
         </div>
       </label>
+
+      <div className="flex justify-end text-sm">
+        <Link href="/login/forgot" className="text-ink/60 hover:underline">Forgot password?</Link>
+      </div>
 
       {error && <p className="text-sm text-red-700">{error}</p>}
 

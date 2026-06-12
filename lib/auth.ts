@@ -15,6 +15,7 @@ export interface SessionPayload extends AuthUser {
 export const SESSION_COOKIE_NAME = 'createaccess_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const AUTH_SECRET = process.env.AUTH_SECRET || 'createaccess-dev-secret';
+const PASSWORD_RESET_TTL_MS = 1000 * 60 * 60; // 1 hour
 
 function toBase64Url(value: string) {
   return btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
@@ -107,6 +108,33 @@ export async function createSessionToken(user: AuthUser): Promise<string> {
   const encodedPayload = toBase64Url(JSON.stringify(payload));
   const signature = await signPayload(encodedPayload);
   return `${encodedPayload}.${signature}`;
+}
+
+export async function createPasswordResetToken(username: string): Promise<string> {
+  const payload = {
+    username,
+    exp: Date.now() + PASSWORD_RESET_TTL_MS,
+  };
+  const encoded = toBase64Url(JSON.stringify(payload));
+  const sig = await signPayload(encoded);
+  return `${encoded}.${sig}`;
+}
+
+export async function getUsernameFromPasswordResetToken(token?: string | null): Promise<string | null> {
+  if (!token) return null;
+  const [encoded, signature] = token.split('.');
+  if (!encoded || !signature) return null;
+
+  const valid = await verifySignature(encoded, signature);
+  if (!valid) return null;
+
+  try {
+    const payload = JSON.parse(fromBase64Url(encoded)) as { username: string; exp: number };
+    if (!payload.exp || payload.exp < Date.now()) return null;
+    return payload.username;
+  } catch {
+    return null;
+  }
 }
 
 export async function getSessionFromToken(token?: string | null): Promise<AuthUser | null> {
