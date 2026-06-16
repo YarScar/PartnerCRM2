@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, Eye, EyeOff, GripVertical, Save } from 'lucide-react';
 
 interface FormField {
@@ -67,6 +67,23 @@ const DEFAULT_CONFIG: FormSection[] = [
 
 export default function AdminPage() {
   const [config, setConfig] = useState<FormSection[]>(DEFAULT_CONFIG);
+  const [promptState, setPromptState] = useState<{
+    open: boolean;
+    message: string;
+    defaultValue?: string;
+    resolve?: (value: string | null) => void;
+  }>({ open: false, message: '' });
+
+  const showPrompt = (message: string, defaultValue?: string) =>
+    new Promise<string | null>((resolve) => {
+      setPromptState({ open: true, message, defaultValue, resolve });
+    });
+
+  const closePrompt = (value: string | null) => {
+    if (promptState.resolve) promptState.resolve(value);
+    setPromptState({ open: false, message: '' });
+  };
+  const promptInputRef = useRef<HTMLInputElement | null>(null);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [draggingField, setDraggingField] = useState<{ sectionId: string; fieldId: string } | null>(null);
@@ -170,8 +187,18 @@ export default function AdminPage() {
     );
   };
 
-  const addField = (sectionId: string) => {
-    const label = prompt('New field label:');
+  const addField = async (sectionId: string) => {
+    let label: string | null = null;
+    try {
+      // prefer native prompt if available
+      if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+        label = window.prompt('New field label:');
+      } else {
+        label = await showPrompt('New field label:');
+      }
+    } catch {
+      label = await showPrompt('New field label:');
+    }
     if (!label) return;
     const id = label.toLowerCase().replace(/[^a-z0-9]+/g, '_');
     setConfig(
@@ -189,29 +216,56 @@ export default function AdminPage() {
     );
   };
 
-  const addSection = () => {
-    const label = prompt('New section label:');
+  const addSection = async () => {
+    let label: string | null = null;
+    try {
+      if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+        label = window.prompt('New section label:');
+      } else {
+        label = await showPrompt('New section label:');
+      }
+    } catch {
+      label = await showPrompt('New section label:');
+    }
     if (!label) return;
     const id = label.toLowerCase().replace(/[^a-z0-9]+/g, '_');
     setConfig([...config, { id, label, fields: [] }]);
   };
 
-  const editFieldOptions = (sectionId: string, fieldId: string) => {
+  const editFieldOptions = async (sectionId: string, fieldId: string) => {
     const section = config.find(s => s.id === sectionId);
     if (!section) return;
     const field = section.fields.find(f => f.id === fieldId);
     if (!field) return;
     
     const currentOptions = (field.options || []).join('\n');
-    const newOptions = prompt('Enter options, one per line:', currentOptions);
+    let newOptions: string | null = null;
+    try {
+      if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+        newOptions = window.prompt('Enter options, one per line:', currentOptions);
+      } else {
+        newOptions = await showPrompt('Enter options, one per line:', currentOptions);
+      }
+    } catch {
+      newOptions = await showPrompt('Enter options, one per line:', currentOptions);
+    }
     if (newOptions === null) return;
     
     const optionsArray = newOptions.split('\n').filter(o => o.trim()).map(o => o.trim());
     updateField(sectionId, fieldId, { options: optionsArray });
   };
 
-  const addFieldOption = (sectionId: string, fieldId: string) => {
-    const label = prompt('New option label:');
+  const addFieldOption = async (sectionId: string, fieldId: string) => {
+    let label: string | null = null;
+    try {
+      if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+        label = window.prompt('New option label:');
+      } else {
+        label = await showPrompt('New option label:');
+      }
+    } catch {
+      label = await showPrompt('New option label:');
+    }
     if (!label?.trim()) return;
 
     const section = config.find((s) => s.id === sectionId);
@@ -440,6 +494,38 @@ export default function AdminPage() {
           </>
         )}
       </div>
+    {promptState.open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => closePrompt(null)} />
+            <div className="bg-white p-4 rounded shadow max-w-md w-full z-60">
+              <div className="mb-2 font-medium">{promptState.message}</div>
+              <input
+                ref={promptInputRef}
+                defaultValue={promptState.defaultValue || ''}
+                className="w-full border px-2 py-1 rounded"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    closePrompt((e.target as HTMLInputElement).value);
+                  } else if (e.key === 'Escape') {
+                    closePrompt(null);
+                  }
+                }}
+                autoFocus
+              />
+              <div className="mt-3 flex justify-end gap-2">
+                <button className="btn-ghost" onClick={() => closePrompt(null)}>
+                  Cancel
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={() => closePrompt(promptInputRef.current ? promptInputRef.current.value : null)}
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }

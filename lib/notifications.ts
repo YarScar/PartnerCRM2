@@ -27,7 +27,7 @@ async function sendViaResend(opts: { from: string; to: string[]; subject: string
     bodyJson = null;
   }
 
-  const result = { sent: response.ok, status: response.status, bodyText, bodyJson };
+  const result = { status: response.status, bodyText, bodyJson };
   if (!response.ok) {
     console.warn('[notifications] resend API error', { status: response.status, bodyText, bodyJson });
     return { sent: false, ...result };
@@ -62,7 +62,7 @@ async function sendMail(opts: { from: string; to: string[]; subject: string; htm
   if (resendResult.sent) return { sent: true, via: 'resend' };
 
   const smtpResult = await sendViaSmtp(opts).catch((e) => ({ sent: false, reason: e?.message }));
-  if (smtpResult.sent) return { sent: true, via: 'smtp', info: smtpResult.info };
+  if (smtpResult.sent) return { sent: true, via: 'smtp', info: (smtpResult as any).info };
 
   console.warn('[notifications] email not sent', { resendResult, smtpResult });
   return { sent: false, resendResult, smtpResult };
