@@ -71,6 +71,15 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [draggingField, setDraggingField] = useState<{ sectionId: string; fieldId: string } | null>(null);
 
+  // inline UI states to avoid prompt()/confirm()
+  const [addingSection, setAddingSection] = useState(false);
+  const [newSectionLabel, setNewSectionLabel] = useState('');
+  const [addingFieldSection, setAddingFieldSection] = useState<string | null>(null);
+  const [newFieldLabel, setNewFieldLabel] = useState('');
+  const [addingOptionFor, setAddingOptionFor] = useState<{ sectionId: string; fieldId: string } | null>(null);
+  const [newOptionLabel, setNewOptionLabel] = useState('');
+  const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
+
   useEffect(() => {
     const loadConfig = async () => {
       try {
@@ -113,25 +122,24 @@ export default function AdminPage() {
   };
 
   const reset = async () => {
-    if (confirm('Reset to default form configuration?')) {
-      setConfig(DEFAULT_CONFIG);
-      try {
-        const orderedDefaults = DEFAULT_CONFIG.map((section, sectionIndex) => ({
-          ...section,
-          fields: section.fields.map((field, fieldIndex) => ({
-            ...field,
-            sort_order: sectionIndex * 100 + fieldIndex,
-          })),
-        }));
+    // perform reset without blocking prompt UI
+    setConfig(DEFAULT_CONFIG);
+    try {
+      const orderedDefaults = DEFAULT_CONFIG.map((section, sectionIndex) => ({
+        ...section,
+        fields: section.fields.map((field, fieldIndex) => ({
+          ...field,
+          sort_order: sectionIndex * 100 + fieldIndex,
+        })),
+      }));
 
-        await fetch('/api/form-config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(orderedDefaults),
-        });
-      } catch (err) {
-        console.error('Failed to reset form config:', err);
-      }
+      await fetch('/api/form-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderedDefaults),
+      });
+    } catch (err) {
+      console.error('Failed to reset form config:', err);
     }
   };
 
@@ -170,8 +178,13 @@ export default function AdminPage() {
     );
   };
 
-  const addField = (sectionId: string) => {
-    const label = prompt('New field label:');
+  const addFieldStart = (sectionId: string) => {
+    setAddingFieldSection(sectionId);
+    setNewFieldLabel('');
+  };
+
+  const addFieldConfirm = (sectionId: string) => {
+    const label = newFieldLabel.trim();
     if (!label) return;
     const id = label.toLowerCase().replace(/[^a-z0-9]+/g, '_');
     setConfig(
@@ -180,47 +193,58 @@ export default function AdminPage() {
           ? s
           : {
               ...s,
-              fields: [
-                ...s.fields,
-                { id, label, type: 'text', visible: true, required: false },
-              ],
+              fields: [...s.fields, { id, label, type: 'text', visible: true, required: false }],
             }
       )
     );
+    setAddingFieldSection(null);
+    setNewFieldLabel('');
   };
 
-  const addSection = () => {
-    const label = prompt('New section label:');
+  const addFieldCancel = () => {
+    setAddingFieldSection(null);
+    setNewFieldLabel('');
+  };
+
+  const addSectionStart = () => {
+    setAddingSection(true);
+    setNewSectionLabel('');
+  };
+
+  const addSectionConfirm = () => {
+    const label = newSectionLabel.trim();
     if (!label) return;
     const id = label.toLowerCase().replace(/[^a-z0-9]+/g, '_');
     setConfig([...config, { id, label, fields: [] }]);
+    setAddingSection(false);
+    setNewSectionLabel('');
   };
 
-  const editFieldOptions = (sectionId: string, fieldId: string) => {
-    const section = config.find(s => s.id === sectionId);
-    if (!section) return;
-    const field = section.fields.find(f => f.id === fieldId);
-    if (!field) return;
-    
-    const currentOptions = (field.options || []).join('\n');
-    const newOptions = prompt('Enter options, one per line:', currentOptions);
-    if (newOptions === null) return;
-    
-    const optionsArray = newOptions.split('\n').filter(o => o.trim()).map(o => o.trim());
-    updateField(sectionId, fieldId, { options: optionsArray });
+  const addSectionCancel = () => {
+    setAddingSection(false);
+    setNewSectionLabel('');
   };
 
-  const addFieldOption = (sectionId: string, fieldId: string) => {
-    const label = prompt('New option label:');
-    if (!label?.trim()) return;
+  const addFieldOptionStart = (sectionId: string, fieldId: string) => {
+    setAddingOptionFor({ sectionId, fieldId });
+    setNewOptionLabel('');
+  };
 
+  const addFieldOptionConfirm = (sectionId: string, fieldId: string) => {
+    const label = newOptionLabel.trim();
+    if (!label) return;
     const section = config.find((s) => s.id === sectionId);
     const field = section?.fields.find((f) => f.id === fieldId);
     if (!field) return;
 
-    updateField(sectionId, fieldId, {
-      options: [...(field.options || []), label.trim()],
-    });
+    updateField(sectionId, fieldId, { options: [...(field.options || []), label] });
+    setAddingOptionFor(null);
+    setNewOptionLabel('');
+  };
+
+  const addFieldOptionCancel = () => {
+    setAddingOptionFor(null);
+    setNewOptionLabel('');
   };
 
   const updateFieldOption = (sectionId: string, fieldId: string, optionIndex: number, value: string) => {
@@ -243,11 +267,17 @@ export default function AdminPage() {
     });
   };
 
-  const removeSection = (sectionId: string) => {
-    if (confirm('Remove this entire section and its fields?')) {
-      setConfig(config.filter((s) => s.id !== sectionId));
-    }
+  const removeSectionStart = (sectionId: string) => {
+    setSectionToDelete(sectionId);
   };
+
+  const removeSectionConfirm = () => {
+    if (!sectionToDelete) return;
+    setConfig(config.filter((s) => s.id !== sectionToDelete));
+    setSectionToDelete(null);
+  };
+
+  const removeSectionCancel = () => setSectionToDelete(null);
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-10">
@@ -294,18 +324,33 @@ export default function AdminPage() {
                 className="font-display font-bold text-xl bg-transparent focus:outline-none focus:bg-cream-soft px-2 py-1 rounded"
               />
               <div className="flex items-center gap-1">
-                <button
-                  onClick={() => addField(section.id)}
-                  className="btn-ghost !text-xs"
-                >
-                  <Plus size={12} /> Field
-                </button>
-                <button
-                  onClick={() => removeSection(section.id)}
-                  className="text-ink/40 hover:text-court p-1.5"
-                >
-                  <Trash2 size={14} />
-                </button>
+                {addingFieldSection === section.id ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="text-sm bg-cream-soft border border-ink/15 rounded px-2 py-1"
+                      value={newFieldLabel}
+                      onChange={(e) => setNewFieldLabel(e.target.value)}
+                      placeholder="Field label"
+                    />
+                    <button onClick={() => addFieldConfirm(section.id)} className="btn-ghost !text-xs">Add</button>
+                    <button onClick={addFieldCancel} className="btn-ghost !text-xs">Cancel</button>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => addFieldStart(section.id)}
+                      className="btn-ghost !text-xs"
+                    >
+                      <Plus size={12} /> Field
+                    </button>
+                    <button
+                      onClick={() => removeSectionStart(section.id)}
+                      className="text-ink/40 hover:text-court p-1.5"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -327,9 +372,7 @@ export default function AdminPage() {
                       moveField(section.id, draggingField.fieldId, field.id);
                       setDraggingField(null);
                     }}
-                    className={`flex items-center gap-3 px-5 py-3 ${
-                      !field.visible ? 'opacity-50' : ''
-                    } ${
+                    className={`flex items-center gap-3 px-5 py-3 ${!field.visible ? 'opacity-50' : ''} ${
                       draggingField?.sectionId === section.id && draggingField?.fieldId === field.id
                         ? 'bg-court/10'
                         : ''
@@ -391,7 +434,7 @@ export default function AdminPage() {
                         ))}
                         <button
                           type="button"
-                          onClick={() => addFieldOption(section.id, field.id)}
+                          onClick={() => addFieldOptionStart(section.id, field.id)}
                           className="text-xs text-court-deep hover:text-court font-medium"
                         >
                           + Add item
@@ -432,11 +475,31 @@ export default function AdminPage() {
         ))}
 
         <button
-          onClick={addSection}
+          onClick={addSectionStart}
           className="w-full card !p-6 border-dashed text-ink/50 hover:text-ink hover:border-court hover:text-court transition-all flex items-center justify-center gap-2"
         >
           <Plus size={16} /> Add Section
         </button>
+        {addingSection && (
+          <div className="card p-4">
+            <div className="flex gap-2">
+              <input className="flex-1 text-sm bg-cream-soft border border-ink/15 rounded px-2 py-1" value={newSectionLabel} onChange={(e) => setNewSectionLabel(e.target.value)} placeholder="Section label" />
+              <button onClick={addSectionConfirm} className="btn-ghost">Add</button>
+              <button onClick={addSectionCancel} className="btn-ghost">Cancel</button>
+            </div>
+          </div>
+        )}
+        {sectionToDelete && (
+          <div className="card p-4">
+            <div className="flex items-center justify-between">
+              <div>Remove section and its fields?</div>
+              <div className="flex gap-2">
+                <button onClick={removeSectionConfirm} className="btn-ghost">Remove</button>
+                <button onClick={removeSectionCancel} className="btn-ghost">Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
           </>
         )}
       </div>
