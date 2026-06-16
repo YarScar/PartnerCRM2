@@ -1,30 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 
-export async function GET() {
+function intakePrefix(form: string | null) {
+  return form === 'intake' ? 'intake:' : '';
+}
+
+export async function GET(req: NextRequest) {
   try {
-    const config = await prisma.formConfig.findMany({
+    const url = new URL(req.url);
+    const form = url.searchParams.get('form');
+    const prefix = intakePrefix(form);
+
+    const all = await prisma.formConfig.findMany({
       orderBy: [{ sort_order: 'asc' }],
     });
 
-    // Transform flat structure into nested sections
-    const sections = new Map();
-    config.forEach(row => {
-      if (!sections.has(row.section_key)) {
-        sections.set(row.section_key, {
-          id: row.section_key,
+    // Filter rows by prefix: intake rows start with 'intake:', client rows do not
+    const rows = all.filter((r) => {
+      const isIntake = r.section_key.startsWith('intake:');
+      return form === 'intake' ? isIntake : !isIntake;
+    });
+
+    const sections = new Map<string, any>();
+    rows.forEach((row) => {
+      const sectionKey = prefix ? row.section_key.replace(/^intake:/, '') : row.section_key;
+      if (!sections.has(sectionKey)) {
+        sections.set(sectionKey, {
+          id: sectionKey,
           label: row.section_label,
           fields: [],
         });
       }
-      sections.get(row.section_key).fields.push({
+      sections.get(sectionKey).fields.push({
         id: row.field_key,
         label: row.field_label,
         type: row.field_type as any,
         visible: row.visible ?? true,
         required: row.required ?? false,
         options: row.options,
-          sort_order: row.sort_order,
+        sort_order: row.sort_order,
       });
     });
 
@@ -36,18 +50,27 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const url = new URL(req.url);
+    const form = url.searchParams.get('form');
+    const prefix = intakePrefix(form);
+
     const sections = await req.json();
 
-    // Delete all existing config
-    await prisma.formConfig.deleteMany({});
+    // Delete existing config for this form only
+    if (form === 'intake') {
+      await prisma.formConfig.deleteMany({ where: { section_key: { startsWith: 'intake:' } } });
+    } else {
+      await prisma.formConfig.deleteMany({ where: { section_key: { not: { startsWith: 'intake:' } } } });
+    }
 
-    // Insert new config
+    // Insert new config (prefix section keys for intake when needed)
     let sortOrder = 0;
     for (const section of sections) {
+      const sectionKey = `${prefix}${section.id}`;
       for (const field of section.fields) {
         await prisma.formConfig.create({
           data: {
-            section_key: section.id,
+            section_key: sectionKey,
             section_label: section.label,
             field_key: field.id,
             field_label: field.label,

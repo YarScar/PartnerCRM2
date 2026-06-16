@@ -1,8 +1,20 @@
+import Link from 'next/link';
+import { cookies } from 'next/headers';
+import { getSessionFromToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 import { PublicIntakeForm } from '@/components/PublicIntakeForm';
 
-export default function IntakePage() {
+export default async function IntakePage() {
+  const cookieStore = await cookies();
+  const user = await getSessionFromToken(cookieStore.get(SESSION_COOKIE_NAME)?.value ?? null);
+  const isAdmin = user?.role === 'admin';
+
   return (
     <div className="max-w-6xl mx-auto px-6 py-10 md:py-16">
+      {isAdmin && (
+        <div className="mb-6 flex justify-end">
+          <Link href="/admin/intake" className="btn-ghost">Edit Intake Form</Link>
+        </div>
+      )}
       <div className="grid lg:grid-cols-12 gap-10 items-start">
         <div className="lg:col-span-5 space-y-6">
           <div className="text-xs uppercase tracking-widest text-court font-semibold">

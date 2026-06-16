@@ -27,45 +27,11 @@ const DEFAULT_CONFIG: FormSection[] = [
       { id: 'contact_name', label: 'Contact Name', type: 'text', visible: true, required: false },
       { id: 'contact_email', label: 'Contact Email', type: 'text', visible: true, required: false },
       { id: 'contact_phone', label: 'Contact Phone', type: 'text', visible: true, required: false },
-      { id: 'org_website', label: 'Website', type: 'text', visible: true, required: false },
-    ],
-  },
-  {
-    id: 'program',
-    label: 'Program & Approach',
-    fields: [
-      { id: 'program_structure', label: 'Program Structure', type: 'textarea', visible: true, required: false },
-      { id: 'youth_ages', label: 'Youth Ages', type: 'text', visible: true, required: false },
-      { id: 'how_kids_connect', label: 'How Kids Connect', type: 'text', visible: true, required: false },
-      { id: 'recruitment_needed', label: 'Recruitment Needed', type: 'boolean', visible: true, required: false },
-    ],
-  },
-  {
-    id: 'request',
-    label: "What They're Looking For",
-    fields: [
-      { id: 'desired_program_type', label: 'Desired Program Type', type: 'select', visible: true, required: false },
-      { id: 'specific_project_request', label: 'Specific Project', type: 'textarea', visible: true, required: false },
-      { id: 'wants_recommendations', label: 'Open to Recommendations', type: 'boolean', visible: true, required: false },
-      { id: 'desired_timeline', label: 'Desired Timeline', type: 'text', visible: true, required: false },
-      { id: 'firm_dates', label: 'Firm Dates', type: 'text', visible: true, required: false },
-    ],
-  },
-  {
-    id: 'tech',
-    label: 'Tech & Space',
-    fields: [
-      { id: 'works_with_3d_tech', label: 'Works with 3D Tech', type: 'select', visible: true, required: false },
-      { id: 'hardware_inventory', label: 'Hardware Inventory', type: 'checklist', visible: true, required: false },
-      { id: 'available_computers', label: 'Available Computers', type: 'text', visible: true, required: false },
-      { id: 'internet_availability', label: 'Internet / WiFi', type: 'select', visible: true, required: false },
-      { id: 'available_space', label: 'Available Space', type: 'textarea', visible: true, required: false },
-      { id: 'on_site_assistance', label: 'On-Site Assistance', type: 'boolean', visible: true, required: false },
     ],
   },
 ];
 
-export default function AdminPage() {
+export default function AdminIntakePage() {
   const [config, setConfig] = useState<FormSection[]>(DEFAULT_CONFIG);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -79,17 +45,18 @@ export default function AdminPage() {
   const [addingOptionFor, setAddingOptionFor] = useState<{ sectionId: string; fieldId: string } | null>(null);
   const [newOptionLabel, setNewOptionLabel] = useState('');
   const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
+  const publicUrl = typeof window !== 'undefined' ? window.location.origin + '/intake' : '/intake';
 
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const res = await fetch('/api/form-config');
+        const res = await fetch('/api/form-config?form=intake');
         if (res.ok) {
           const data = await res.json();
           setConfig(data);
         }
       } catch (err) {
-        console.error('Failed to load form config:', err);
+        console.error('Failed to load intake form config:', err);
       } finally {
         setLoading(false);
       }
@@ -107,7 +74,7 @@ export default function AdminPage() {
         })),
       }));
 
-      const res = await fetch('/api/form-config', {
+      const res = await fetch('/api/form-config?form=intake', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderedConfig),
@@ -117,12 +84,11 @@ export default function AdminPage() {
         setTimeout(() => setSaved(false), 2000);
       }
     } catch (err) {
-      console.error('Failed to save form config:', err);
+      console.error('Failed to save intake form config:', err);
     }
   };
 
   const reset = async () => {
-    // perform reset without blocking prompt UI
     setConfig(DEFAULT_CONFIG);
     try {
       const orderedDefaults = DEFAULT_CONFIG.map((section, sectionIndex) => ({
@@ -133,13 +99,13 @@ export default function AdminPage() {
         })),
       }));
 
-      await fetch('/api/form-config', {
+      await fetch('/api/form-config?form=intake', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderedDefaults),
       });
     } catch (err) {
-      console.error('Failed to reset form config:', err);
+      console.error('Failed to reset intake form config:', err);
     }
   };
 
@@ -279,6 +245,15 @@ export default function AdminPage() {
 
   const removeSectionCancel = () => setSectionToDelete(null);
 
+  const copyPublicUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      alert('Public intake URL copied to clipboard');
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-6 py-10">
       <div className="flex items-end justify-between flex-wrap gap-4 mb-2">
@@ -287,11 +262,8 @@ export default function AdminPage() {
             Configuration
           </div>
           <h1 className="font-display text-5xl md:text-6xl font-bold tracking-tight">
-            Form
+            Intake Form
           </h1>
-          <div className="mt-2">
-            <a href="/admin/intake" className="text-sm text-ink/60 hover:text-ink">Edit public intake form →</a>
-          </div>
         </div>
         <div className="flex gap-2 items-center">
           {saved && <span className="text-sm text-emerald-700 font-medium">✓ Saved</span>}
@@ -303,14 +275,21 @@ export default function AdminPage() {
           </button>
         </div>
       </div>
+
+      <div className="mb-6 flex items-center gap-3">
+        <input readOnly value={publicUrl} className="input-base flex-1" />
+        <button onClick={copyPublicUrl} className="btn-ghost">
+          Copy Link
+        </button>
+      </div>
+
       <p className="text-ink/60 mb-10 max-w-2xl">
-        Customize what fields appear on the partner intake form. Toggle visibility, mark fields as required,
-        rename labels, or add new fields. Changes save to the database.
+        Customize the public intake form that clients fill out. This form is separate from the internal partner form.
       </p>
 
       <div className="space-y-4">
         {loading ? (
-          <div className="text-center py-10 text-ink/50">Loading form configuration...</div>
+          <div className="text-center py-10 text-ink/50">Loading intake form configuration...</div>
         ) : (
           <>
             {config.map((section) => (
