@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { getSessionFromToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 import { PublicIntakeForm } from '@/components/PublicIntakeForm';
+import { ShareLink } from '@/components/ShareLink';
 
 export default async function IntakePage() {
   const cookieStore = await cookies();
@@ -12,7 +13,10 @@ export default async function IntakePage() {
     <div className="max-w-6xl mx-auto px-6 py-10 md:py-16">
       {isAdmin && (
         <div className="mb-6 flex justify-end">
-          <Link href="/admin/intake" className="btn-ghost">Edit Intake Form</Link>
+          <div className="flex items-center gap-3">
+            <ShareLink path="/intake" />
+            <Link href="/admin/intake" className="btn-ghost">Edit Intake Form</Link>
+          </div>
         </div>
       )}
       <div className="grid lg:grid-cols-12 gap-10 items-start">
