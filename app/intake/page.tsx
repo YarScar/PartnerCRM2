@@ -14,7 +14,7 @@ export default async function IntakePage() {
       {isAdmin && (
         <div className="mb-6 flex justify-end">
           <div className="flex items-center gap-3">
-            <ShareLink path="/intake" />
+            <ShareLink path="/public/intake" />
             <Link href="/admin/intake" className="btn-ghost">Edit Intake Form</Link>
           </div>
         </div>

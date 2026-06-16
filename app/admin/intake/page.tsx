@@ -45,7 +45,7 @@ export default function AdminIntakePage() {
   const [addingOptionFor, setAddingOptionFor] = useState<{ sectionId: string; fieldId: string } | null>(null);
   const [newOptionLabel, setNewOptionLabel] = useState('');
   const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
-  const publicUrl = typeof window !== 'undefined' ? window.location.origin + '/intake' : '/intake';
+  const publicUrl = typeof window !== 'undefined' ? window.location.origin + '/public/intake' : '/public/intake';
 
   useEffect(() => {
     const loadConfig = async () => {

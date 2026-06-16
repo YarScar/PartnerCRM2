@@ -8,7 +8,9 @@ export function ShareLink({ path = '/intake' }: { path?: string }) {
 
   useEffect(() => {
     try {
-      setUrl(window.location.origin.replace(/\/+$/, '') + path);
+      // Default to the public-facing intake path
+      const resolved = path || '/public/intake';
+      setUrl(window.location.origin.replace(/\/+$/, '') + resolved);
     } catch {
       setUrl(path);
     }
