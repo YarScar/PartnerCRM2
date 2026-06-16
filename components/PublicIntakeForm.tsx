@@ -36,11 +36,42 @@ export function PublicIntakeForm() {
 
     const formData = new FormData(event.currentTarget as HTMLFormElement);
     const body: any = {};
-    formData.forEach((value, key) => {
-      // coerce checkbox values
-      const val = value as string;
-      body[key] = val;
-    });
+
+    // If no config (legacy short form), build body generically
+    if (!config) {
+      formData.forEach((value, key) => {
+        const existing = body[key];
+        const val = String(value);
+        if (existing === undefined) body[key] = val;
+        else if (Array.isArray(existing)) existing.push(val);
+        else body[key] = [existing, val];
+      });
+    } else {
+      // Build body based on config field types so arrays/booleans are handled correctly
+      for (const section of config) {
+      for (const field of section.fields) {
+        if (!field.visible) continue;
+        const name = field.id;
+        const type: FieldType = field.type;
+
+        if (type === 'checklist') {
+          const values = formData.getAll(name).map((v) => String(v));
+          body[name] = values;
+          continue;
+        }
+
+        if (type === 'boolean') {
+          // checkbox present means true, absent means false
+          body[name] = formData.get(name) !== null;
+          continue;
+        }
+
+        // text, textarea, select
+        const val = formData.get(name);
+        body[name] = val === null ? null : String(val);
+      }
+      }
+    }
 
     try {
       const response = await fetch('/api/intake', {
