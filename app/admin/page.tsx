@@ -287,7 +287,7 @@ export default function AdminPage() {
             Configuration
           </div>
           <h1 className="font-display text-5xl md:text-6xl font-bold tracking-tight">
-            Form Builder
+            Form
           </h1>
         </div>
         <div className="flex gap-2 items-center">

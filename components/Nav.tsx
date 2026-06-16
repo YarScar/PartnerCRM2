@@ -10,7 +10,7 @@ const links = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/partners', label: 'Partners', icon: Users },
   { href: '/intake', label: 'Intake Form', icon: FileEdit },
-  { href: '/admin', label: 'Admin', icon: Settings },
+  { href: '/admin', label: 'Form', icon: Settings },
 ];
 
 export function Nav({ user }: { user: AuthUser | null }) {
