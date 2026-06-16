@@ -362,7 +362,7 @@ export default function AdminPage() {
               ) : (
                 section.fields.map((field) => (
                   <div
-                    key={field.id}
+                    key={`${section.id}-${field.id}`}
                     draggable
                     onDragStart={() => setDraggingField({ sectionId: section.id, fieldId: field.id })}
                     onDragEnd={() => setDraggingField(null)}
@@ -432,13 +432,26 @@ export default function AdminPage() {
                             </button>
                           </div>
                         ))}
-                        <button
-                          type="button"
-                          onClick={() => addFieldOptionStart(section.id, field.id)}
-                          className="text-xs text-court-deep hover:text-court font-medium"
-                        >
-                          + Add item
-                        </button>
+                        {addingOptionFor?.sectionId === section.id && addingOptionFor?.fieldId === field.id ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              className="text-xs bg-cream-soft border border-ink/15 rounded px-2 py-1"
+                              value={newOptionLabel}
+                              onChange={(e) => setNewOptionLabel(e.target.value)}
+                              placeholder="Option label"
+                            />
+                            <button type="button" onClick={() => addFieldOptionConfirm(section.id, field.id)} className="text-xs text-court-deep">Add</button>
+                            <button type="button" onClick={addFieldOptionCancel} className="text-xs">Cancel</button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => addFieldOptionStart(section.id, field.id)}
+                            className="text-xs text-court-deep hover:text-court font-medium"
+                          >
+                            + Add item
+                          </button>
+                        )}
                       </div>
                     )}
                     <label className="flex items-center gap-1.5 text-xs text-ink/60">

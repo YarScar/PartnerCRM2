@@ -33,6 +33,7 @@ export function PartnerDetailClient({
   const [partner, setPartner] = useState(initialPartner);
   const [isPending, startTransition] = useTransition();
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [noteBody, setNoteBody] = useState('');
   const [noteAuthor, setNoteAuthor] = useState('');
   const [showAddNote, setShowAddNote] = useState(false);
@@ -69,13 +70,12 @@ export function PartnerDetailClient({
     }
   };
 
-  const deletePartner = async () => {
-    if (!window.confirm(`Delete ${partner.org_name}? This cannot be undone.`)) return;
-
+  const performDelete = async () => {
     setDeleting(true);
     const res = await fetch(`/api/partners/${partner.id}`, { method: 'DELETE' });
 
     if (res.ok) {
+      setShowDeleteConfirm(false);
       router.push('/partners');
       router.refresh();
       return;
@@ -98,10 +98,25 @@ export function PartnerDetailClient({
               Edit
             </Link>
             {canDelete && (
-              <button onClick={deletePartner} className="btn-ghost text-court" disabled={deleting}>
-                <Trash2 size={14} />
-                {deleting ? 'Deleting...' : 'Delete'}
-              </button>
+              <>
+                <button onClick={() => setShowDeleteConfirm(true)} className="btn-ghost text-court" disabled={deleting}>
+                  <Trash2 size={14} />
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
+                {showDeleteConfirm && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="bg-cream rounded-lg p-6 max-w-md w-full">
+                      <div className="mb-4 text-sm">Delete <strong>{partner.org_name}</strong>? This cannot be undone.</div>
+                      <div className="flex justify-end gap-2">
+                        <button className="btn-ghost" onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>Cancel</button>
+                        <button className="btn-primary" onClick={performDelete} disabled={deleting}>
+                          {deleting ? 'Deleting...' : 'Delete'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

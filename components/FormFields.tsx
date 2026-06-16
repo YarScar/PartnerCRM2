@@ -84,11 +84,11 @@ export function SelectField({ name, options, defaultValue, placeholder, ...rest 
         className="input-base"
       >
         {placeholder && <option value="">{placeholder}</option>}
-        {options.map((opt) => {
+        {options.map((opt, idx) => {
           const value = typeof opt === 'string' ? opt : opt.value;
           const label = typeof opt === 'string' ? opt : opt.label;
           return (
-            <option key={value} value={value}>
+            <option key={`${name}-${value}-${idx}`} value={value}>
               {label}
             </option>
           );

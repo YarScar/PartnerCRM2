@@ -196,7 +196,7 @@ export function PartnerForm({ partner, mode }: Props) {
       case 'text':
         return (
           <TextField
-            key={field.id}
+            key={`${sectionNumber}-${field.id}`}
             {...commonProps}
             placeholder={field.label}
           />
@@ -204,7 +204,7 @@ export function PartnerForm({ partner, mode }: Props) {
       case 'textarea':
         return (
           <TextareaField
-            key={field.id}
+            key={`${sectionNumber}-${field.id}`}
             {...commonProps}
             placeholder={field.label}
             rows={2}
@@ -213,7 +213,7 @@ export function PartnerForm({ partner, mode }: Props) {
       case 'boolean':
         return (
           <SelectField
-            key={field.id}
+            key={`${sectionNumber}-${field.id}`}
             {...commonProps}
             options={[
               { value: 'true', label: 'Yes' },
@@ -244,7 +244,7 @@ export function PartnerForm({ partner, mode }: Props) {
         }
         return (
           <SelectField
-            key={field.id}
+            key={`${sectionNumber}-${field.id}`}
             {...commonProps}
             options={options}
             placeholder="Select..."
@@ -253,7 +253,7 @@ export function PartnerForm({ partner, mode }: Props) {
       case 'checklist':
         if (field.id === 'hardware_inventory') {
           return (
-            <div key={field.id}>
+            <div key={`${sectionNumber}-${field.id}`}>
               <label className="label-base">{field.label}</label>
               <p className="text-xs text-ink/50 mb-3">
                 Tap to select equipment you have on-site, then specify quantities and notes.
@@ -267,7 +267,7 @@ export function PartnerForm({ partner, mode }: Props) {
         }
         return (
           <DynamicChecklist
-            key={field.id}
+            key={`${sectionNumber}-${field.id}`}
             name={field.id}
             label={field.label}
             options={field.options || []}
