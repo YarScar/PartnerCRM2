@@ -35,12 +35,14 @@ export async function GET(req: NextRequest) {
           fields: [],
         });
       }
+      const meta = row.options && (row.options as any).meta ? (row.options as any).meta : {};
       sections.get(sectionKey).fields.push({
         id: row.field_key,
         label: row.field_label,
         type: row.field_type as any,
         visible: row.visible ?? true,
         required: row.required ?? false,
+        public: meta.public ?? undefined,
         options: row.options,
         sort_order: row.sort_order,
       });
@@ -75,9 +77,11 @@ export async function POST(req: NextRequest) {
         // Support storing metadata inside options as { items?: [...], meta?: {...} }
         let optionsToStore: any = null;
         const hasOptionsArray = Array.isArray(field.options) && field.options.length > 0;
-        const hasMeta = (field as any).meta && Object.keys((field as any).meta).length > 0;
-        if (hasOptionsArray && hasMeta) optionsToStore = { items: field.options, meta: (field as any).meta };
-        else if (hasMeta) optionsToStore = { meta: (field as any).meta };
+        const incomingMeta = (field as any).meta ? { ...(field as any).meta } : {};
+        if (typeof (field as any).public !== 'undefined') incomingMeta.public = (field as any).public;
+        const hasMeta = incomingMeta && Object.keys(incomingMeta).length > 0;
+        if (hasOptionsArray && hasMeta) optionsToStore = { items: field.options, meta: incomingMeta };
+        else if (hasMeta) optionsToStore = { meta: incomingMeta };
         else if (hasOptionsArray) optionsToStore = field.options;
 
         await prisma.formConfig.create({

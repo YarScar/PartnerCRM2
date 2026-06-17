@@ -10,6 +10,7 @@ interface FormField {
   type: 'text' | 'textarea' | 'select' | 'boolean' | 'checklist';
   visible: boolean;
   required: boolean;
+  public?: boolean;
   options?: string[];
 }
 
@@ -197,7 +198,7 @@ export default function AdminPage() {
           ? s
           : {
               ...s,
-              fields: [...s.fields, { id: lib.id, label: lib.label, type: lib.type, visible: true, required: false }],
+              fields: [...s.fields, { id: lib.id, label: lib.label, type: lib.type, visible: true, required: false, public: false }],
             }
       )
     );
@@ -215,7 +216,7 @@ export default function AdminPage() {
           ? s
           : {
               ...s,
-              fields: [...s.fields, { id, label, type: 'text', visible: true, required: false }],
+              fields: [...s.fields, { id, label, type: 'text', visible: true, required: false, public: false }],
             }
       )
     );
@@ -509,6 +510,17 @@ export default function AdminPage() {
                         className="accent-court"
                       />
                       Required
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-ink/60">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(field.public)}
+                        onChange={(e) =>
+                          updateField(section.id, field.id, { public: e.target.checked })
+                        }
+                        className="accent-court"
+                      />
+                      Public
                     </label>
                     <button
                       onClick={() =>
