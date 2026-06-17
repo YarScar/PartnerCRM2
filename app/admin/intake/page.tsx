@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Eye, EyeOff, GripVertical, Save } from 'lucide-react';
+import { FIELD_LIBRARY } from '@/lib/fieldLibrary';
 
 interface FormField {
   id: string;
@@ -42,6 +43,8 @@ export default function AdminIntakePage() {
   const [newSectionLabel, setNewSectionLabel] = useState('');
   const [addingFieldSection, setAddingFieldSection] = useState<string | null>(null);
   const [newFieldLabel, setNewFieldLabel] = useState('');
+  const [showLibraryFor, setShowLibraryFor] = useState<string | null>(null);
+  const [selectedLibraryField, setSelectedLibraryField] = useState<string>('');
   const [addingOptionFor, setAddingOptionFor] = useState<{ sectionId: string; fieldId: string } | null>(null);
   const [newOptionLabel, setNewOptionLabel] = useState('');
   const [sectionToDelete, setSectionToDelete] = useState<string | null>(null);
@@ -147,6 +150,24 @@ export default function AdminIntakePage() {
   const addFieldStart = (sectionId: string) => {
     setAddingFieldSection(sectionId);
     setNewFieldLabel('');
+  };
+
+  const addFieldFromLibrary = (sectionId: string) => {
+    const lib = FIELD_LIBRARY.find((f) => f.id === selectedLibraryField);
+    if (!lib) return;
+    if (config.some((s) => s.fields.some((f) => f.id === lib.id))) return;
+    setConfig(
+      config.map((s) =>
+        s.id !== sectionId
+          ? s
+          : {
+              ...s,
+              fields: [...s.fields, { id: lib.id, label: lib.label, type: lib.type, visible: true, required: false }],
+            }
+      )
+    );
+    setShowLibraryFor(null);
+    setSelectedLibraryField('');
   };
 
   const addFieldConfirm = (sectionId: string) => {
@@ -307,24 +328,27 @@ export default function AdminIntakePage() {
               />
               <div className="flex items-center gap-1">
                 {addingFieldSection === section.id ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      className="text-sm bg-cream-soft border border-ink/15 rounded px-2 py-1"
-                      value={newFieldLabel}
-                      onChange={(e) => setNewFieldLabel(e.target.value)}
-                      placeholder="Field label"
-                    />
-                    <button onClick={() => addFieldConfirm(section.id)} className="btn-ghost !text-xs">Add</button>
-                    <button onClick={addFieldCancel} className="btn-ghost !text-xs">Cancel</button>
-                  </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        className="text-sm bg-cream-soft border border-ink/15 rounded px-2 py-1"
+                        value={newFieldLabel}
+                        onChange={(e) => setNewFieldLabel(e.target.value)}
+                        placeholder="Field label"
+                      />
+                      <button onClick={() => addFieldConfirm(section.id)} className="btn-ghost !text-xs">Add</button>
+                      <button onClick={addFieldCancel} className="btn-ghost !text-xs">Cancel</button>
+                    </div>
                 ) : (
                   <>
-                    <button
-                      onClick={() => addFieldStart(section.id)}
-                      className="btn-ghost !text-xs"
-                    >
-                      <Plus size={12} /> Field
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => addFieldStart(section.id)}
+                        className="btn-ghost !text-xs"
+                      >
+                        <Plus size={12} /> Field
+                      </button>
+                      <button onClick={() => setShowLibraryFor(section.id)} className="btn-ghost !text-xs">From Table</button>
+                    </div>
                     <button
                       onClick={() => removeSectionStart(section.id)}
                       className="text-ink/40 hover:text-court p-1.5"
@@ -334,6 +358,22 @@ export default function AdminIntakePage() {
                   </>
                 )}
               </div>
+              {showLibraryFor === section.id && (
+                <div className="px-5 py-3 bg-cream-soft border-t border-ink/10">
+                  <div className="flex items-center gap-2">
+                    <select className="input-base flex-1" value={selectedLibraryField} onChange={(e) => setSelectedLibraryField(e.target.value)}>
+                      <option value="">Select a field to add…</option>
+                      {FIELD_LIBRARY.map((f) => (
+                        <option key={f.id} value={f.id} disabled={config.some((s) => s.fields.some((ff) => ff.id === f.id))}>
+                          {f.label} — {f.id}
+                        </option>
+                      ))}
+                    </select>
+                    <button className="btn-ghost" onClick={() => addFieldFromLibrary(section.id)} disabled={!selectedLibraryField}>Add</button>
+                    <button className="btn-ghost" onClick={() => setShowLibraryFor(null)}>Cancel</button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="divide-y divide-ink/10">

@@ -110,6 +110,20 @@ export function toPrismaData(data: Partial<Partner>): Prisma.PartnerUncheckedCre
   };
 }
 
+function normalizePartnerKeys(data: Partial<Partner>): Partial<Partner> {
+  const out = { ...data } as any;
+  if (!out.org_name) {
+    if (out.name) out.org_name = out.name;
+    else if (out.organization) out.org_name = out.organization;
+    else if (out.org) out.org_name = out.org;
+  }
+  if (!out.contact_email && out.email) out.contact_email = out.email;
+  if (!out.contact_phone && out.phone) out.contact_phone = out.phone;
+  if (!out.contact_name && out.contact) out.contact_name = out.contact;
+  if (!out.intake_message && out.message) out.intake_message = out.message;
+  return out as Partial<Partner>;
+}
+
 function toPrismaUpdateData(data: Partial<Partner>): Prisma.PartnerUncheckedUpdateInput {
   const out: Prisma.PartnerUncheckedUpdateInput = {};
   for (const [key, value] of Object.entries(data)) {
@@ -145,19 +159,21 @@ export async function getPartner(id: number): Promise<Partner | null> {
 }
 
 export async function createPartner(data: Partial<Partner>): Promise<Partner> {
-  if (!hasDb()) return addMockPartner(data);
+  const normalized = normalizePartnerKeys(data);
+  if (!hasDb()) return addMockPartner(normalized);
 
   const created = await prisma.partner.create({
-    data: toPrismaData(data),
+    data: toPrismaData(normalized),
     include: { notes: { orderBy: { created_at: 'desc' } } },
   });
   return mapPartner(created);
 }
 
 export async function updatePartner(id: number, data: Partial<Partner>): Promise<Partner | null> {
-  if (!hasDb()) return updateMockPartner(id, data);
+  const normalized = normalizePartnerKeys(data);
+  if (!hasDb()) return updateMockPartner(id, normalized);
 
-  const updateData = toPrismaUpdateData(data);
+  const updateData = toPrismaUpdateData(normalized);
   if (Object.keys(updateData).length === 0) return getPartner(id);
 
   try {

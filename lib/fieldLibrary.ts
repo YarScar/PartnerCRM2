@@ -1,0 +1,16 @@
+export const FIELD_LIBRARY = [
+  { id: 'org_name', label: 'Organization Name', type: 'text' },
+  { id: 'contact_name', label: 'Contact Name', type: 'text' },
+  { id: 'contact_email', label: 'Contact Email', type: 'text' },
+  { id: 'contact_phone', label: 'Contact Phone', type: 'text' },
+  { id: 'org_website', label: 'Website', type: 'text' },
+  { id: 'program_structure', label: 'Program Structure', type: 'textarea' },
+  { id: 'youth_ages', label: 'Youth Ages', type: 'text' },
+  { id: 'recruitment_needed', label: 'Recruitment Needed', type: 'boolean' },
+  { id: 'desired_program_type', label: 'Desired Program Type', type: 'select' },
+  { id: 'hardware_inventory', label: 'Hardware Inventory', type: 'checklist' },
+  { id: 'available_computers', label: 'Available Computers', type: 'text' },
+  { id: 'internet_availability', label: 'Internet / WiFi', type: 'select' },
+  { id: 'available_space', label: 'Available Space', type: 'textarea' },
+  { id: 'on_site_assistance', label: 'On-Site Assistance', type: 'boolean' },
+];

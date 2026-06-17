@@ -1,5 +1,4 @@
 'use client';
-
 import { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Partner, PARTNER_STATUSES, PROGRAM_TYPES } from '@/lib/types';
@@ -14,7 +13,8 @@ interface FormField {
   type: 'text' | 'textarea' | 'select' | 'boolean' | 'checklist';
   visible: boolean;
   required: boolean;
-  options?: string[];
+  options?: string[] | { value: string; label: string }[];
+  meta?: Record<string, any>;
 }
 
 interface FormSection {
@@ -136,10 +136,34 @@ export function PartnerForm({ partner, mode }: Props) {
           : '/api/intake';
       const method = mode === 'edit' ? 'PATCH' : 'POST';
 
+      // Normalize arbitrary form keys to canonical DB keys before sending
+      const normalizeKey = (k: string) => k.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      const canonical = (key: string) => {
+        const k = normalizeKey(key);
+        const map: Record<string, string> = {
+          name: 'org_name',
+          org: 'org_name',
+          organization: 'org_name',
+          email: 'contact_email',
+          phone: 'contact_phone',
+          contact: 'contact_name',
+          message: 'intake_message',
+        };
+        return map[k] || k;
+      };
+
+      const mappedData: Record<string, any> = {};
+      Object.entries(data).forEach(([k, v]) => {
+        mappedData[canonical(k)] = v;
+      });
+
+      // eslint-disable-next-line no-console
+      console.log('PartnerForm submitting to', endpoint, method, mappedData);
+
       const res = await fetch(endpoint, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(mappedData),
       });
 
       if (!res.ok) {

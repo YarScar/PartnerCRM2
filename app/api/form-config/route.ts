@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { prisma, hasDb } from '@/lib/db';
+import DEFAULT_FORM_CONFIG from '@/lib/defaultFormConfig';
 
 function intakePrefix(form: string | null) {
   return form === 'intake' ? 'intake:' : '';
 }
 
 export async function GET(req: NextRequest) {
+  // If no DATABASE_URL is configured, return the local default config immediately
+  if (!hasDb()) return NextResponse.json(DEFAULT_FORM_CONFIG);
+
   try {
     const url = new URL(req.url);
     const form = url.searchParams.get('form');
@@ -44,7 +48,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(Array.from(sections.values()));
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
   }
 }
 
@@ -68,6 +72,14 @@ export async function POST(req: NextRequest) {
     for (const section of sections) {
       const sectionKey = `${prefix}${section.id}`;
       for (const field of section.fields) {
+        // Support storing metadata inside options as { items?: [...], meta?: {...} }
+        let optionsToStore: any = null;
+        const hasOptionsArray = Array.isArray(field.options) && field.options.length > 0;
+        const hasMeta = (field as any).meta && Object.keys((field as any).meta).length > 0;
+        if (hasOptionsArray && hasMeta) optionsToStore = { items: field.options, meta: (field as any).meta };
+        else if (hasMeta) optionsToStore = { meta: (field as any).meta };
+        else if (hasOptionsArray) optionsToStore = field.options;
+
         await prisma.formConfig.create({
           data: {
             section_key: sectionKey,
@@ -75,7 +87,7 @@ export async function POST(req: NextRequest) {
             field_key: field.id,
             field_label: field.label,
             field_type: field.type,
-            options: field.options || null,
+            options: optionsToStore,
             visible: field.visible,
             required: field.required,
             sort_order: field.sort_order ?? sortOrder,
