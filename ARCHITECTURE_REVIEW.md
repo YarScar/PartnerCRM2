@@ -218,3 +218,13 @@ The improvements made ensure:
 - Follows industry best practices for Next.js + ORM architecture
 
 For production deployment, focus on password hashing upgrade and input validation.
+
+## Dynamic form configuration (form_config)
+
+Recent work added admin-driven dynamic form rows persisted in `form_config`. Highlights:
+
+- **Flat storage**: rows are stored as `section_key`, `field_key`, and an `options` JSON column allowing flexible field definitions without schema migrations.
+- **Public intake**: fields can be flagged `meta.public` in `options`. When saved, the API ensures an `intake:`-prefixed copy exists for public consumption and the intake `GET` endpoint deduplicates rows by normalized `section:field_key`.
+- **Normalization**: Partner create/update paths normalize arbitrary admin field keys to canonical DB columns to ensure data is stored correctly.
+
+Files of interest: `app/api/form-config/route.ts`, `app/admin/page.tsx`, `components/PublicIntakeForm.tsx`, and `components/PartnerForm.tsx`.

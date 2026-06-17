@@ -89,3 +89,11 @@ prisma/
 - Add file uploads for partner documents (Neon doesn't store files; pair with S3 or Vercel Blob).
 - Email notifications when intake forms come in.
 - Export to CSV.
+
+## Form configuration & public intake (current)
+
+- Admin-managed form rows persist to the `form_config` table as flat rows (`section_key`, `field_key`, `options` JSON). This allows adding/removing fields without DB schema changes.
+- Fields may include `options.meta.public` to mark them public. Public fields cause the API to upsert an `intake:`-prefixed copy so the public intake can be rendered independently.
+- The intake `GET` handler deduplicates by normalized `section:field_key` to ensure a single canonical row per field and avoid duplicate rendering.
+
+See `docs/documentation.md` for details on challenges and fixes related to the form system.
