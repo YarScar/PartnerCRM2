@@ -9,10 +9,17 @@ interface ChecklistItem {
   checked: boolean;
 }
 
+interface OptionItem {
+  value: string;
+  label: string;
+}
+
+type OptionsProp = readonly string[] | OptionItem[];
+
 interface Props {
   name: string;
   label: string;
-  options?: string[];
+  options?: OptionsProp;
   defaultValue?: ChecklistItem[] | string;
   hint?: string;
 }
@@ -45,11 +52,17 @@ export function DynamicChecklist({ name, label, options = [], defaultValue, hint
       }
       return [];
     }
-    return options.map(opt => ({
-      id: opt.toLowerCase().replace(/[^a-z0-9]+/g, '_'),
-      label: opt,
-      checked: false,
-    }));
+    return options.map((opt: any) => {
+      const label = typeof opt === 'string' ? opt : opt.label ?? String(opt.value ?? opt);
+      return {
+        id: (typeof opt === 'string' ? opt : opt.value ?? opt.label ?? String(opt))
+          .toString()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_'),
+        label,
+        checked: false,
+      };
+    });
   });
 
   const handleToggle = (id: string) => {

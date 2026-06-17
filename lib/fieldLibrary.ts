@@ -1,4 +1,12 @@
-export const FIELD_LIBRARY = [
+type FieldType = 'text' | 'textarea' | 'select' | 'boolean' | 'checklist';
+
+export type FieldLibraryItem = {
+  id: string;
+  label: string;
+  type: FieldType;
+};
+
+export const FIELD_LIBRARY: FieldLibraryItem[] = [
   { id: 'org_name', label: 'Organization Name', type: 'text' },
   { id: 'contact_name', label: 'Contact Name', type: 'text' },
   { id: 'contact_email', label: 'Contact Email', type: 'text' },
