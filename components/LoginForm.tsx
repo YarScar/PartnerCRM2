@@ -72,6 +72,11 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
         </div>
       </label>
 
+      <div className="flex justify-between items-center">
+        <div />
+        <a href="/forgot-password" className="text-sm text-ink/60 hover:underline">Forgot password?</a>
+      </div>
+
       {error && <p className="text-sm text-red-700">{error}</p>}
 
       <button type="submit" className="btn-primary w-full justify-center" disabled={submitting}>

@@ -1,0 +1,58 @@
+import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
+import { getSessionFromToken, isAdmin, SESSION_COOKIE_NAME } from '@/lib/auth';
+import { getDigestData } from '@/lib/digest';
+
+export async function GET(req: NextRequest) {
+  try {
+    const cookie = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const user = await getSessionFromToken(cookie);
+    if (!user || !isAdmin(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    const data = await getDigestData();
+
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('OPENAI_API_KEY missing in environment');
+      return NextResponse.json({ error: 'OPENAI_API_KEY missing' }, { status: 500 });
+    }
+
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    const system = `You are a program coordinator assistant for CreateAccess, a nonprofit that brings basketball and technology programs to youth organizations. Write in a warm, encouraging, professional tone. Be concise — one sentence per bullet point.`;
+
+    const userPrompt = `Generate a weekly partnership digest. Today is ${new Date().toDateString()}.
+
+New inquiries this week: ${JSON.stringify(data.newIntakes)}
+Partners with updates: ${JSON.stringify(data.statusChanges)}
+Timelines coming up (next 30 days): ${JSON.stringify(data.upcomingTimelines)}
+Active partners gone quiet (14+ days no activity): ${JSON.stringify(data.quietPartners)}
+Total active partners: ${data.totalActive}
+
+Write the digest using exactly these markdown sections:
+## 🆕 New Inquiries This Week
+## 🔄 Recent Updates
+## 📅 Timelines to Watch
+## 🔇 Follow Up Needed
+## 📊 Quick Stats
+
+If a section has no data write "Nothing to report this week."
+End with one short sentence of encouragement for the team.`;
+
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 1000,
+      temperature: 0.4,
+    });
+
+    const markdown = resp.choices?.[0]?.message?.content || '';
+
+    return NextResponse.json({ markdown, generatedAt: new Date().toISOString(), data });
+  } catch (err: any) {
+    console.error('digest GET error', err);
+    return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
+  }
+}

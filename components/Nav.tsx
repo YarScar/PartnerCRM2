@@ -3,13 +3,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, FileEdit, Settings, LogOut, UserRound } from 'lucide-react';
+import { LayoutDashboard, Users, FileEdit, Settings, LogOut, UserRound, Sparkles } from 'lucide-react';
 import type { AuthUser } from '@/lib/auth';
 
 const links = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/partners', label: 'Partners', icon: Users },
   { href: '/intake', label: 'Intake Form', icon: FileEdit },
+  { href: '/admin/digest', label: 'Weekly Digest', icon: Sparkles },
   { href: '/admin', label: 'Form', icon: Settings },
 ];
 
