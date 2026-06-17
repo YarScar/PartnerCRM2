@@ -19,11 +19,42 @@ export async function GET(req: NextRequest) {
       orderBy: [{ sort_order: 'asc' }],
     });
 
-    // Filter rows by prefix: intake rows start with 'intake:', client rows do not
-    const rows = all.filter((r) => {
+    // Filter rows by prefix: intake rows start with 'intake:'.
+    // Also include non-prefixed rows that have options.meta.public === true when requesting the public intake.
+    let rows = all.filter((r) => {
       const isIntake = r.section_key.startsWith('intake:');
-      return form === 'intake' ? isIntake : !isIntake;
+      if (form === 'intake') {
+        if (isIntake) return true;
+        try {
+          const meta = r.options && (r.options as any).meta;
+          if (meta && meta.public === true) return true;
+        } catch (e) {
+          // ignore
+        }
+        return false;
+      }
+      return !isIntake;
     });
+
+    // Deduplicate rows by normalized section + field, preferring explicit intake: rows when present.
+    const deduped = new Map<string, any>();
+    for (const r of rows) {
+      const normalizedSection = r.section_key.replace(/^intake:/, '');
+      const key = `${normalizedSection}:${r.field_key}`;
+      const existing = deduped.get(key);
+      if (!existing) {
+        deduped.set(key, r);
+        continue;
+      }
+      // prefer intake-prefixed row over non-prefixed
+      const existingIsIntake = String(existing.section_key).startsWith('intake:');
+      const thisIsIntake = String(r.section_key).startsWith('intake:');
+      if (thisIsIntake && !existingIsIntake) {
+        deduped.set(key, r);
+      }
+      // otherwise keep existing
+    }
+    rows = Array.from(deduped.values());
 
     const sections = new Map<string, any>();
     rows.forEach((row) => {
@@ -97,6 +128,55 @@ export async function POST(req: NextRequest) {
             sort_order: field.sort_order ?? sortOrder,
           },
         });
+
+        // If this field is marked public on the internal form, ensure an intake-prefixed
+        // copy exists so it appears on the public intake. Use upsert to avoid duplicates.
+        try {
+          if ((field as any).public) {
+            const intakeSectionKey = `intake:${section.id}`;
+            // ensure meta.public is true for the intake copy
+            const intakeMeta = (field as any).meta ? { ...(field as any).meta } : {};
+            intakeMeta.public = true;
+            let intakeOptions: any = null;
+            const hasOptionsArray2 = Array.isArray(field.options) && field.options.length > 0;
+            const hasMeta2 = intakeMeta && Object.keys(intakeMeta).length > 0;
+            if (hasOptionsArray2 && hasMeta2) intakeOptions = { items: field.options, meta: intakeMeta };
+            else if (hasMeta2) intakeOptions = { meta: intakeMeta };
+            else if (hasOptionsArray2) intakeOptions = field.options;
+
+            await prisma.formConfig.upsert({
+              where: {
+                section_key_field_key: {
+                  section_key: intakeSectionKey,
+                  field_key: field.id,
+                },
+              },
+              update: {
+                section_label: section.label,
+                field_label: field.label,
+                field_type: field.type,
+                options: intakeOptions,
+                visible: field.visible,
+                required: field.required,
+                sort_order: field.sort_order ?? sortOrder,
+              },
+              create: {
+                section_key: intakeSectionKey,
+                section_label: section.label,
+                field_key: field.id,
+                field_label: field.label,
+                field_type: field.type,
+                options: intakeOptions,
+                visible: field.visible,
+                required: field.required,
+                sort_order: field.sort_order ?? sortOrder,
+              },
+            });
+          }
+        } catch (e) {
+          // Non-fatal: log and continue so admin save doesn't fail if intake upsert errors
+          console.error('Failed to upsert intake copy for public field', field.id, e);
+        }
         sortOrder += 1;
       }
     }
