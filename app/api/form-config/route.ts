@@ -50,7 +50,22 @@ export async function GET(req: NextRequest) {
       const existingIsIntake = String(existing.section_key).startsWith('intake:');
       const thisIsIntake = String(r.section_key).startsWith('intake:');
       if (thisIsIntake && !existingIsIntake) {
-        deduped.set(key, r);
+        // If the non-intake (existing) row explicitly marks public=false, prefer it
+        // so admin changes to not-public override any stale intake-prefixed copies.
+        const existingMeta = existing.options && (existing.options as any).meta ? (existing.options as any).meta : {};
+        if (existingMeta.public === false) {
+          // keep existing non-intake row
+        } else {
+          deduped.set(key, r);
+        }
+      }
+      if (existingIsIntake && !thisIsIntake) {
+        // If the incoming non-intake row explicitly marks public=false, prefer it
+        // to override any intake-prefixed copy.
+        const thisMeta = r.options && (r.options as any).meta ? (r.options as any).meta : {};
+        if (thisMeta.public === false) {
+          deduped.set(key, r);
+        }
       }
       // otherwise keep existing
     }
@@ -132,8 +147,8 @@ export async function POST(req: NextRequest) {
         // If this field is marked public on the internal form, ensure an intake-prefixed
         // copy exists so it appears on the public intake. Use upsert to avoid duplicates.
         try {
+          const intakeSectionKey = `intake:${section.id}`;
           if ((field as any).public) {
-            const intakeSectionKey = `intake:${section.id}`;
             // ensure meta.public is true for the intake copy
             const intakeMeta = (field as any).meta ? { ...(field as any).meta } : {};
             intakeMeta.public = true;
@@ -172,13 +187,50 @@ export async function POST(req: NextRequest) {
                 sort_order: field.sort_order ?? sortOrder,
               },
             });
+          } else if (typeof (field as any).public !== 'undefined' && (field as any).public === false) {
+            // If the field is explicitly set to not public, remove any intake-prefixed copy
+            await prisma.formConfig.deleteMany({
+              where: {
+                section_key: intakeSectionKey,
+                field_key: field.id,
+              },
+            });
           }
         } catch (e) {
-          // Non-fatal: log and continue so admin save doesn't fail if intake upsert errors
-          console.error('Failed to upsert intake copy for public field', field.id, e);
+          // Non-fatal: log and continue so admin save doesn't fail if intake upsert/delete errors
+          console.error('Failed to upsert/delete intake copy for field', field.id, e);
         }
         sortOrder += 1;
       }
+    }
+
+    // Cleanup: remove any intake-prefixed rows whose non-prefixed counterpart
+    // is not explicitly public. This prevents stale intake copies from remaining
+    // after an admin saves fields as not public.
+    try {
+      const nonIntakeRows = await prisma.formConfig.findMany({
+        where: { section_key: { not: { startsWith: 'intake:' } } },
+      });
+      const nonIntakeMap = new Map<string, any>();
+      nonIntakeRows.forEach((r) => {
+        const key = `${r.section_key}:${r.field_key}`;
+        const meta = r.options && (r.options as any).meta ? (r.options as any).meta : {};
+        nonIntakeMap.set(key, meta.public === true);
+      });
+
+      const intakeRows = await prisma.formConfig.findMany({
+        where: { section_key: { startsWith: 'intake:' } },
+      });
+      for (const r of intakeRows) {
+        const normalizedSection = r.section_key.replace(/^intake:/, '');
+        const key = `${normalizedSection}:${r.field_key}`;
+        const shouldBePublic = nonIntakeMap.get(key) === true;
+        if (!shouldBePublic) {
+          await prisma.formConfig.deleteMany({ where: { section_key: r.section_key, field_key: r.field_key } });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to cleanup intake-prefixed rows', e);
     }
 
     return NextResponse.json({ success: true });
