@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Loader2, Mail, MessageSquare, Building2 } from 'lucide-react';
+import normalizeOptions from '@/lib/formConfigUtils';
 
 type FieldType = 'text' | 'textarea' | 'select' | 'boolean' | 'checklist';
 
@@ -179,7 +180,7 @@ export function PublicIntakeForm() {
                         <option value="" disabled>
                           Select…
                         </option>
-                        {(field.options || []).map((opt: string) => (
+                        {normalizeOptions(field.options).map((opt: string) => (
                           <option key={opt} value={opt}>
                             {opt}
                           </option>
@@ -203,7 +204,7 @@ export function PublicIntakeForm() {
                     <div key={name}>
                       <div className="label-base mb-2">{field.label}</div>
                       <div className="space-y-2">
-                        {(field.options || []).map((opt: string, idx: number) => (
+                        {normalizeOptions(field.options).map((opt: string, idx: number) => (
                           <label className="flex items-center gap-2" key={idx}>
                             <input type="checkbox" name={name} value={opt} className="accent-court" />
                             <span className="text-sm">{opt}</span>

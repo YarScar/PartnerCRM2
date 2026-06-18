@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import normalizeOptions from '@/lib/formConfigUtils';
 import { Plus, Trash2, Eye, EyeOff, GripVertical, Save } from 'lucide-react';
 import { FIELD_LIBRARY } from '@/lib/fieldLibrary';
 
@@ -225,7 +226,8 @@ export default function AdminIntakePage() {
     const field = section?.fields.find((f) => f.id === fieldId);
     if (!field) return;
 
-    updateField(sectionId, fieldId, { options: [...(field.options || []), label] });
+    const next = normalizeOptions(field.options);
+    updateField(sectionId, fieldId, { options: [...next, label] });
     setAddingOptionFor(null);
     setNewOptionLabel('');
   };
@@ -240,7 +242,7 @@ export default function AdminIntakePage() {
     const field = section?.fields.find((f) => f.id === fieldId);
     if (!field) return;
 
-    const nextOptions = [...(field.options || [])];
+    const nextOptions = [...normalizeOptions(field.options)];
     nextOptions[optionIndex] = value;
     updateField(sectionId, fieldId, { options: nextOptions.filter(Boolean) });
   };
@@ -251,7 +253,7 @@ export default function AdminIntakePage() {
     if (!field) return;
 
     updateField(sectionId, fieldId, {
-      options: (field.options || []).filter((_, index) => index !== optionIndex),
+      options: normalizeOptions(field.options).filter((_, index) => index !== optionIndex),
     });
   };
 
@@ -434,7 +436,7 @@ export default function AdminIntakePage() {
                     </select>
                     {(field.type === 'select' || field.type === 'checklist') && (
                       <div className="ml-auto w-72 space-y-2">
-                        {(field.options || []).map((option, optionIndex) => (
+                        {normalizeOptions(field.options).map((option, optionIndex) => (
                           <div key={`${field.id}-${optionIndex}`} className="flex items-center gap-2">
                             <input
                               type="text"

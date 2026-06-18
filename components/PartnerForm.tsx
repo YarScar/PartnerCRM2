@@ -3,6 +3,7 @@ import { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Partner, PARTNER_STATUSES, PROGRAM_TYPES } from '@/lib/types';
 import { TextField, TextareaField, SelectField } from '@/components/FormFields';
+import normalizeOptions from '@/lib/formConfigUtils';
 import { HardwareChecklist } from '@/components/HardwareChecklist';
 import { DynamicChecklist } from '@/components/DynamicChecklist';
 import { Save, Loader2, Building2, Users, Cpu, HardDrive } from 'lucide-react';
@@ -264,7 +265,7 @@ export function PartnerForm({ partner, mode }: Props) {
             'No internet',
           ];
         } else if (field.options) {
-          options = field.options;
+          options = normalizeOptions(field.options);
         }
         return (
           <SelectField
@@ -294,7 +295,7 @@ export function PartnerForm({ partner, mode }: Props) {
             key={`${sectionNumber}-${field.id}`}
             name={field.id}
             label={field.label}
-            options={field.options || []}
+            options={normalizeOptions(field.options)}
             defaultValue={getFieldValue(field.id)}
           />
         );
