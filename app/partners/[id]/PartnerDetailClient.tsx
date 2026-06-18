@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Partner, PARTNER_STATUSES, PartnerStatus } from '@/lib/types';
@@ -273,6 +273,9 @@ export function PartnerDetailClient({
         )}
       </Section>
 
+          {/* Dynamic fields grouped by admin-defined sections from form-config */}
+          <DynamicFieldsSection partner={partner} />
+
       {/* Conversation log */}
       <Section number="05" title="Conversation Log" icon={MessageSquarePlus}>
         <div className="mb-4">
@@ -403,5 +406,123 @@ function DataField({
       </div>
       <div className="text-sm leading-relaxed">{displayValue}</div>
     </div>
+  );
+}
+
+function DynamicFieldsSection({ partner }: { partner: any }) {
+  const [config, setConfig] = useState<any[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/form-config');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (mounted) setConfig(data || []);
+      } catch (e) {
+        // ignore
+      }
+    })();
+    return () => { mounted = false };
+  }, []);
+
+  const known = new Set([
+    'id', 'org_name', 'contact_name', 'contact_email', 'contact_phone', 'contact_role',
+    'org_website', 'org_address', 'org_city', 'org_state', 'status', 'program_structure',
+    'who_they_work_with', 'youth_ages', 'how_kids_connect', 'intake_message', 'recruitment_needed',
+    'recruitment_notes', 'program_times', 'schedule_flexibility', 'desired_program_type',
+    'specific_project_request', 'wants_recommendations', 'desired_timeline', 'firm_dates',
+    'works_with_3d_tech', 'three_d_tech_specifics', 'hardware_inventory', 'hardware_notes',
+    'available_computers', 'internet_availability', 'available_space', 'on_site_assistance',
+    'on_site_assistance_notes', 'accessibility_limitations', 'general_tech_context', 'source',
+    'created_at', 'updated_at', 'notes', 'properties'
+  ]);
+
+  // build field map: fieldKey -> { sectionLabel, fieldLabel, fieldType, options }
+  const fieldMap = new Map<string, { sectionLabel: string; fieldLabel: string; fieldType?: string; options?: any }>();
+  for (const section of config) {
+    const sectionLabel = section.label || section.section_label || 'Custom Fields';
+    const fields = section.fields || section.fields || [];
+    for (const f of fields) {
+      const key = f.id || f.field_key || f.key;
+      if (key) fieldMap.set(key, {
+        sectionLabel,
+        fieldLabel: f.label || f.field_label || key,
+        fieldType: f.type || f.field_type,
+        options: f.options || f.options,
+      });
+    }
+  }
+
+  // collect partner dynamic keys
+  const dynamic: Record<string, Array<{ key: string; label: string; value: any }>> = {};
+  Object.entries(partner).forEach(([k, v]) => {
+    if (known.has(k)) return;
+    const mapping = fieldMap.get(k);
+    const sectionLabel = mapping ? mapping.sectionLabel : 'Custom Fields';
+    const fieldLabel = mapping ? mapping.fieldLabel : k.replace(/_/g, ' ');
+    // format value
+    let display: any = v;
+    const isChecklist = mapping && mapping.fieldType === 'checklist';
+    if (isChecklist) {
+      // try parse checklist JSON into array of items
+      if (typeof v === 'string') {
+        try {
+          const parsed = JSON.parse(v);
+          if (Array.isArray(parsed)) display = parsed;
+        } catch {
+          // leave as raw
+        }
+      }
+    } else if (typeof v === 'string') {
+      const s = v.trim();
+      if ((s.startsWith('[') || s.startsWith('{')) && (s.includes('{') || s.includes('['))) {
+        try {
+          const parsed = JSON.parse(s);
+          if (Array.isArray(parsed)) {
+            display = parsed.map((it: any) => (it.label || it.type || JSON.stringify(it))).join(', ');
+          } else if (typeof parsed === 'object') {
+            display = Object.values(parsed).join(', ');
+          }
+        } catch {
+          display = v;
+        }
+      }
+    }
+    if (!dynamic[sectionLabel]) dynamic[sectionLabel] = [];
+    dynamic[sectionLabel].push({ key: k, label: fieldLabel, value: display, isChecklist });
+  });
+
+  const sections = Object.entries(dynamic);
+  if (sections.length === 0) return null;
+
+  return (
+    <>
+      {sections.map(([sectionLabel, items], idx) => (
+        <Section key={String(idx)} number={String(6 + idx).padStart(2, '0')} title={sectionLabel} icon={Building2}>
+          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-4">
+            {items.map((it: any) => (
+              it.isChecklist && Array.isArray(it.value) ? (
+                <div key={it.key} className="sm:col-span-2">
+                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-ink/50 mb-1">
+                    {it.label}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {it.value.map((opt: any, i: number) => (
+                      <span key={i} className="px-3 py-1.5 rounded-full text-xs font-medium border bg-cream-soft text-ink/80 border-ink/15">
+                        {opt.label || opt.type || String(opt)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <DataField key={it.key} label={it.label} value={String(it.value)} />
+              )
+            ))}
+          </div>
+        </Section>
+      ))}
+    </>
   );
 }

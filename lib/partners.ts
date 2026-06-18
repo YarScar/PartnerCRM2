@@ -69,6 +69,19 @@ function mapPartner(partner: PrismaPartnerWithNotes): Partner {
   };
 }
 
+// Merge persisted custom properties into the returned partner object so
+// admin-created dynamic fields appear as top-level keys in the UI.
+function mergePropertiesIntoPartner(partnerObj: Partner, raw: PrismaPartnerWithNotes): Partner {
+  const props = (raw as any).properties as Record<string, unknown> | null | undefined;
+  if (!props || typeof props !== 'object') return partnerObj;
+  const out = { ...partnerObj } as any;
+  for (const [k, v] of Object.entries(props)) {
+    if (out[k] === undefined) out[k] = v as any;
+  }
+  return out as Partner;
+}
+
+
 export function toPrismaData(data: Partial<Partner>): Prisma.PartnerUncheckedCreateInput {
   return {
     org_name: data.org_name || '',
@@ -107,6 +120,8 @@ export function toPrismaData(data: Partial<Partner>): Prisma.PartnerUncheckedCre
     accessibility_limitations: data.accessibility_limitations || null,
     general_tech_context: data.general_tech_context || null,
     source: data.source || 'manual',
+    // allow creating a partner with initial custom properties
+    ...(data as any).properties ? { properties: (data as any).properties as Prisma.InputJsonValue } : {},
   };
 }
 
@@ -126,15 +141,72 @@ function normalizePartnerKeys(data: Partial<Partner>): Partial<Partner> {
 
 function toPrismaUpdateData(data: Partial<Partner>): Prisma.PartnerUncheckedUpdateInput {
   const out: Prisma.PartnerUncheckedUpdateInput = {};
+  const props: Record<string, unknown> = {};
+
+  // Known top-level partner columns that can be directly updated
+  const knownKeys = new Set([
+    'org_name',
+    'contact_name',
+    'contact_email',
+    'contact_phone',
+    'contact_role',
+    'org_website',
+    'org_address',
+    'org_city',
+    'org_state',
+    'status',
+    'program_structure',
+    'who_they_work_with',
+    'youth_ages',
+    'how_kids_connect',
+    'intake_message',
+    'recruitment_needed',
+    'recruitment_notes',
+    'program_times',
+    'schedule_flexibility',
+    'desired_program_type',
+    'specific_project_request',
+    'wants_recommendations',
+    'desired_timeline',
+    'firm_dates',
+    'works_with_3d_tech',
+    'three_d_tech_specifics',
+    'hardware_inventory',
+    'hardware_notes',
+    'available_computers',
+    'internet_availability',
+    'available_space',
+    'on_site_assistance',
+    'on_site_assistance_notes',
+    'accessibility_limitations',
+    'general_tech_context',
+    'source',
+  ]);
+
   for (const [key, value] of Object.entries(data)) {
     if (value === undefined) continue;
     if (key === 'id' || key === 'created_at' || key === 'updated_at' || key === 'notes') continue;
+
     if (key === 'hardware_inventory') {
       out.hardware_inventory = value as unknown as Prisma.JsonArray;
       continue;
     }
-    (out as Record<string, unknown>)[key] = value;
+
+    if (knownKeys.has(key)) {
+      (out as Record<string, unknown>)[key] = value;
+      continue;
+    }
+
+    // Treat any unknown keys as custom properties and store in `properties` JSON
+    props[key] = value;
   }
+
+  if (Object.keys(props).length > 0) {
+    // Merge into properties column (overwrite existing properties field)
+    // Prisma type accepts Json for properties if present in schema
+    (out as Record<string, unknown>)['properties'] = props as unknown as Prisma.InputJsonValue;
+  }
+
   return out;
 }
 
@@ -145,7 +217,7 @@ export async function listPartners(): Promise<Partner[]> {
     orderBy: { updated_at: 'desc' },
     include: { notes: { orderBy: { created_at: 'desc' } } },
   });
-  return rows.map(mapPartner);
+  return rows.map((r) => mergePropertiesIntoPartner(mapPartner(r), r));
 }
 
 export async function getPartner(id: number): Promise<Partner | null> {
@@ -155,7 +227,7 @@ export async function getPartner(id: number): Promise<Partner | null> {
     where: { id },
     include: { notes: { orderBy: { created_at: 'desc' } } },
   });
-  return partner ? mapPartner(partner) : null;
+  return partner ? mergePropertiesIntoPartner(mapPartner(partner), partner) : null;
 }
 
 export async function createPartner(data: Partial<Partner>): Promise<Partner> {
@@ -177,12 +249,24 @@ export async function updatePartner(id: number, data: Partial<Partner>): Promise
   if (Object.keys(updateData).length === 0) return getPartner(id);
 
   try {
+    // If we're updating custom properties, merge with existing properties
+    if ((updateData as any).properties) {
+      try {
+        const existing = await prisma.partner.findUnique({ where: { id }, select: { properties: true as any } });
+        const existingProps = (existing && (existing as any).properties) || {};
+        const merged = { ...existingProps, ...(updateData as any).properties };
+        (updateData as any).properties = merged;
+      } catch (e) {
+        // Non-fatal: continue with updateData as-is
+        console.error('Failed to merge existing partner properties', e);
+      }
+    }
     const updated = await prisma.partner.update({
       where: { id },
       data: updateData,
       include: { notes: { orderBy: { created_at: 'desc' } } },
     });
-    return mapPartner(updated);
+    return mergePropertiesIntoPartner(mapPartner(updated), updated);
   } catch {
     return null;
   }
