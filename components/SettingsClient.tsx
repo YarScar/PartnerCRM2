@@ -8,6 +8,8 @@ export function SettingsClient({ user }: { user: any }) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [email, setEmail] = useState(user.email || '');
+  const [emailStatus, setEmailStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -49,6 +51,23 @@ export function SettingsClient({ user }: { user: any }) {
     setSubmitting(false);
   };
 
+  const handleSendVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailStatus(null);
+    try {
+      const res = await fetch('/api/auth/request-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Failed to send verification');
+      setEmailStatus('Verification email sent — check your inbox');
+    } catch (err: any) {
+      setEmailStatus(err?.message || 'Failed to send verification');
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-6 py-10">
       <Link
@@ -86,6 +105,21 @@ export function SettingsClient({ user }: { user: any }) {
             <div className="space-y-2">
               <div className="text-xs uppercase tracking-widest text-ink/50">Display Name</div>
               <div className="text-sm font-medium">{user.displayName}</div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-xs uppercase tracking-widest text-ink/50">Email</div>
+              <form onSubmit={handleSendVerification} className="flex gap-2 items-center">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="input-base"
+                  placeholder="you@example.com"
+                />
+                <button className="btn-primary" type="submit">Send verification</button>
+              </form>
+              {emailStatus && <div className="text-sm text-ink/60">{emailStatus}</div>}
             </div>
 
             <div className="space-y-2">

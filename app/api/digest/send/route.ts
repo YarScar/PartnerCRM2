@@ -63,7 +63,17 @@ End with one short sentence of encouragement for the team.`;
     if (invalid.length > 0) console.warn('digest send: invalid admin email addresses, skipping:', invalid);
 
     if (adminEmails.length === 0) {
+      console.warn('digest send: no valid admin email addresses found in users, checking ADMIN_EMAILS env');
+      const envList = (process.env.ADMIN_EMAILS || '').split(',').map((s) => s.trim()).filter(Boolean);
+      const envValid = envList.filter((e: string) => emailRegex.test(e));
+      if (envValid.length > 0) {
+        adminEmails.push(...envValid);
+      }
+    }
+
+    if (adminEmails.length === 0) {
       console.error('digest send: no valid admin email addresses found; aborting send');
+      return NextResponse.json({ error: 'No admin email addresses configured' }, { status: 400 });
     } else {
       const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
       const subject: string = `CreateAccess Weekly Digest — ${dateStr}`;
