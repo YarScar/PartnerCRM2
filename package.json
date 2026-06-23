@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "next lint",
     "dev:light": "node --max-old-space-size=2048 ./node_modules/.bin/next dev --turbo",
+    "test:smtp": "node ./scripts/test-smtp.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
