@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import { prisma, hasColumn, clearColumnCache } from '@/lib/db';
 import { getSessionFromToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 import { sendEmailVerification } from '@/lib/email';
+import apiError from '@/lib/apiError';
+import ensureEnvLoaded from '@/lib/loadEnv';
 
 function validEmail(e: string) {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
@@ -71,9 +73,10 @@ export async function POST(req: NextRequest) {
 
     const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/verify-email?token=${token}`;
 
+    // Ensure local .env is loaded if env vars were added after the server started
+    ensureEnvLoaded();
     console.log('Attempting email send to:', normalized);
-    console.log('EMAIL_USER:', process.env.EMAIL_USER);
-    console.log('EMAIL_PASS exists:', !!process.env.EMAIL_PASS);
+    console.log('RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
     console.log('Verify URL:', verifyUrl);
 
     try {
@@ -85,7 +88,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    console.error('request-verification error', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiError(err);
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromToken, SESSION_COOKIE_NAME, changePassword } from '@/lib/auth';
+import apiError from '@/lib/apiError';
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +23,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    console.error('update-password error', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiError(err);
   }
 }

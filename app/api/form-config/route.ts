@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import apiError from '@/lib/apiError';
 import { prisma, hasDb } from '@/lib/db';
 import DEFAULT_FORM_CONFIG from '@/lib/defaultFormConfig';
 
@@ -96,7 +97,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(Array.from(sections.values()));
   } catch (err: any) {
-    return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
+    return apiError(err);
   }
 }
 
@@ -235,6 +236,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiError(err);
   }
 }

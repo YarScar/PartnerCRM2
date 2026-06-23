@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { addNote } from '@/lib/partners';
+import apiError from '@/lib/apiError';
 import { getSessionFromToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -15,6 +16,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const note = await addNote(parseInt(id), body, author || user.displayName);
     return NextResponse.json({ note }, { status: 201 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiError(err);
   }
 }

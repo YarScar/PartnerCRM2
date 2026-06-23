@@ -26,7 +26,12 @@ export async function POST(req: NextRequest) {
         });
 
         const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
-        sendPasswordResetEmail(normalized, resetUrl).catch((err) => console.error('sendPasswordResetEmail error', err));
+        try {
+          await sendPasswordResetEmail(normalized, resetUrl);
+        } catch (err) {
+          console.error('sendPasswordResetEmail failed for', normalized, err);
+          // Do not surface provider errors to the client; still return OK for security
+        }
       } catch (err) {
         console.error('forgot-password inner error', err);
       }

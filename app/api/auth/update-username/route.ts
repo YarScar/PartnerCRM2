@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromToken, SESSION_COOKIE_NAME, createSessionToken } from '@/lib/auth';
+import apiError from '@/lib/apiError';
 import { prisma } from '@/lib/db';
 
 function validUsername(u: string) {
@@ -28,7 +29,6 @@ export async function POST(req: NextRequest) {
     response.cookies.set({ name: SESSION_COOKIE_NAME, value: token, httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 60 * 60 * 24 * 7 });
     return response;
   } catch (err: any) {
-    console.error('update-username error', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiError(err);
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticate, createSessionToken } from '@/lib/auth';
+import apiError from '@/lib/apiError';
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,6 +23,6 @@ export async function POST(req: NextRequest) {
     });
     return response;
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return apiError(err);
   }
 }

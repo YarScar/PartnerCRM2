@@ -1,6 +1,8 @@
-import Resend from 'resend';
+import { Resend } from 'resend';
+import ensureEnvLoaded from './loadEnv';
 
 function getResend() {
+  ensureEnvLoaded();
   return new Resend(process.env.RESEND_API_KEY);
 }
 
