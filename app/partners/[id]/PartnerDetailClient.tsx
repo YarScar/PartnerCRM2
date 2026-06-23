@@ -456,7 +456,7 @@ function DynamicFieldsSection({ partner }: { partner: any }) {
   }
 
   // collect partner dynamic keys
-  const dynamic: Record<string, Array<{ key: string; label: string; value: any }>> = {};
+  const dynamic: Record<string, Array<{ key: string; label: string; value: any; isChecklist?: boolean }>> = {};
   Object.entries(partner).forEach(([k, v]) => {
     if (known.has(k)) return;
     const mapping = fieldMap.get(k);

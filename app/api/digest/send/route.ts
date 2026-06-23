@@ -52,14 +52,15 @@ End with one short sentence of encouragement for the team.`;
     });
 
     const markdown = resp.choices?.[0]?.message?.content || '';
-    const html = marked.parse(markdown);
+    const html: string = await Promise.resolve(marked.parse(markdown));
 
     // collect admin emails
     const admins = await prisma.user.findMany({ where: { role: 'admin' } as any, select: { username: true } as any });
     const adminEmails = admins.map((a: any) => a.username).filter(Boolean);
 
     if (adminEmails.length > 0) {
-      const subject = `CreateAccess Weekly Digest — ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+      const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      const subject: string = `CreateAccess Weekly Digest — ${dateStr}`;
       await sendHtmlEmail(adminEmails, subject, html);
     }
 

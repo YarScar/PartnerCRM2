@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     // Find DB user from session (prefer email in session)
     let dbUser: any = null;
     try {
-      dbUser = await prisma.user.findUnique({ where: { email: user.email ?? undefined, username: user.username } as any });
+      dbUser = await prisma.user.findUnique({ where: { email: (user as any).email ?? undefined, username: user.username } as any });
     } catch (err: any) {
       console.error('request-verification: DB lookup failed, invalidating email column cache', err?.message ?? err);
       clearColumnCache('users', 'email');
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     if (!dbUser) return NextResponse.json({ error: 'User not found in DB' }, { status: 500 });
 
     // Ensure no other user already has this email
-    const existing = await prisma.user.findFirst({ where: { email: normalized } });
+    const existing = await prisma.user.findFirst({ where: { email: normalized } as any });
     if (existing && existing.id !== dbUser.id) {
       return NextResponse.json({ error: 'Email already in use' }, { status: 400 });
     }
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    await prisma.emailVerificationToken.create({
+    await (prisma as any).emailVerificationToken.create({
       data: {
         token,
         userId: dbUser.id,
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await prisma.user.update({ where: { id: dbUser.id }, data: { pending_email: normalized } });
+    await prisma.user.update({ where: { id: dbUser.id }, data: { pending_email: normalized } as any });
 
     const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/verify-email?token=${token}`;
     sendEmailVerification(normalized, verifyUrl).catch((err) => console.error('sendEmailVerification error', err));

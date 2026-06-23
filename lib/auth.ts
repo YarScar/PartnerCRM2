@@ -6,6 +6,7 @@ export interface AuthUser {
   username: string;
   displayName: string;
   role: UserRole;
+  email?: string;
 }
 
 export interface SessionPayload extends AuthUser {
@@ -124,6 +125,7 @@ export async function getSessionFromToken(token?: string | null): Promise<AuthUs
       username: payload.username,
       displayName: payload.displayName,
       role: payload.role,
+      email: (payload as any).email,
     };
   } catch {
     return null;

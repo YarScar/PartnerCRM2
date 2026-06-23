@@ -9,14 +9,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
 
-    const record = await prisma.passwordResetToken.findUnique({ where: { token } });
+    const record = await (prisma as any).passwordResetToken.findUnique({ where: { token } });
     if (!record || record.used) {
       return NextResponse.json({ ok: true });
     }
 
     if (record.expiresAt < new Date()) {
       // mark used to prevent reuse
-      await prisma.passwordResetToken.update({ where: { token }, data: { used: true } });
+      await (prisma as any).passwordResetToken.update({ where: { token }, data: { used: true } });
       return NextResponse.json({ error: 'Token expired' }, { status: 400 });
     }
 
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     const changed = await changePassword(user.username, password);
 
     // mark token used
-    await prisma.passwordResetToken.update({ where: { token }, data: { used: true } });
+    await (prisma as any).passwordResetToken.update({ where: { token }, data: { used: true } });
 
     if (!changed) return NextResponse.json({ error: 'Failed to update password' }, { status: 500 });
 
