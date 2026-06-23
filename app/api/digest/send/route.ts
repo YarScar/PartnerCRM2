@@ -54,11 +54,17 @@ End with one short sentence of encouragement for the team.`;
     const markdown = resp.choices?.[0]?.message?.content || '';
     const html: string = await Promise.resolve(marked.parse(markdown));
 
-    // collect admin emails
-    const admins = await prisma.user.findMany({ where: { role: 'admin' } as any, select: { username: true } as any });
-    const adminEmails = admins.map((a: any) => a.username).filter(Boolean);
+    // collect admin emails (only keep valid email addresses)
+    const admins = await prisma.user.findMany({ where: { role: 'admin' } as any, select: { username: true, email: true } as any });
+    const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+    const adminEmailsRaw = admins.map((a: any) => a.email || a.username).filter(Boolean);
+    const adminEmails = adminEmailsRaw.filter((e: string) => emailRegex.test(e));
+    const invalid = adminEmailsRaw.filter((e: string) => !emailRegex.test(e));
+    if (invalid.length > 0) console.warn('digest send: invalid admin email addresses, skipping:', invalid);
 
-    if (adminEmails.length > 0) {
+    if (adminEmails.length === 0) {
+      console.error('digest send: no valid admin email addresses found; aborting send');
+    } else {
       const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
       const subject: string = `CreateAccess Weekly Digest — ${dateStr}`;
       await sendHtmlEmail(adminEmails, subject, html);
