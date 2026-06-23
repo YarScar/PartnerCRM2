@@ -30,8 +30,12 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "app/**/*",
+    "components/**/*",
+    "lib/**/*",
+    "db/**/*",
+    "prisma/**/*",
+    "scripts/**/*",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
