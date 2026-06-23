@@ -70,7 +70,18 @@ export async function POST(req: NextRequest) {
     await prisma.user.update({ where: { id: dbUser.id }, data: { pending_email: normalized } as any });
 
     const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/verify-email?token=${token}`;
-    sendEmailVerification(normalized, verifyUrl).catch((err) => console.error('sendEmailVerification error', err));
+
+    console.log('Attempting email send to:', normalized);
+    console.log('EMAIL_USER:', process.env.EMAIL_USER);
+    console.log('EMAIL_PASS exists:', !!process.env.EMAIL_PASS);
+    console.log('Verify URL:', verifyUrl);
+
+    try {
+      await sendEmailVerification(normalized, verifyUrl);
+      console.log('Email sent successfully');
+    } catch (err) {
+      console.error('sendEmailVerification error:', err);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
