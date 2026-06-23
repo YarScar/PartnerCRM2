@@ -1,15 +1,7 @@
-import nodemailer from 'nodemailer';
+import Resend from 'resend';
 
-function createTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: Number(process.env.EMAIL_PORT || 587),
-    secure: process.env.EMAIL_SECURE === 'true' || false,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY);
 }
 
 function wrapHtml(bodyHtml: string, title = 'CreateAccess Weekly Digest', preheader = '') {
@@ -83,18 +75,16 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
   const html = wrapHtml(htmlBody);
   const text = `Reset your CreateAccess password\n\nOpen the link to reset your password: ${resetUrl}`;
 
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    throw new Error(`SMTP credentials missing — EMAIL_USER: ${!!process.env.EMAIL_USER}, EMAIL_PASS: ${!!process.env.EMAIL_PASS}`);
-  }
-
-  const transporter = createTransporter();
-  await transporter.sendMail({
-    from: `CreateAccess <${process.env.EMAIL_USER}>`,
+  if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is missing');
+  const resend = getResend();
+  const { data, error } = (await resend.emails.send({
+    from: 'PartnerCRM <onboarding@resend.dev>',
     to,
     subject,
-    text,
     html,
-  });
+    text,
+  })) as any;
+  if (error) throw new Error(error.message || 'Resend error');
 }
 
 export async function sendIntakeNotification(adminEmails: string[], partner: {
@@ -121,14 +111,14 @@ export async function sendIntakeNotification(adminEmails: string[], partner: {
 
   const table = `
     <table style="width:100%;border-collapse:collapse">${rows
-      .map(
-        ([k, v]) => `
+    .map(
+      ([k, v]) => `
       <tr>
         <td style="padding:6px 8px;border-bottom:1px solid #f1f1f1;font-weight:600;width:35%">${k}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #f1f1f1">${v}</td>
       </tr>`
-      )
-      .join('')}
+    )
+    .join('')}
     </table>
   `;
 
@@ -144,22 +134,20 @@ export async function sendIntakeNotification(adminEmails: string[], partner: {
   const html = wrapHtml(htmlBody);
   const text = `New intake: ${partner.organizationName}\nView: ${viewUrl}`;
 
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    throw new Error(`SMTP credentials missing — EMAIL_USER: ${!!process.env.EMAIL_USER}, EMAIL_PASS: ${!!process.env.EMAIL_PASS}`);
-  }
-
-  const transporter = createTransporter();
-  for (const to of adminEmails) {
+  if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is missing');
+  const resend = getResend();
+  for (const recipient of adminEmails) {
     try {
-      await transporter.sendMail({
-        from: `CreateAccess <${process.env.EMAIL_USER}>`,
-        to,
+      const { data, error } = (await resend.emails.send({
+        from: 'PartnerCRM <onboarding@resend.dev>',
+        to: recipient,
         subject,
-        text,
         html,
-      });
+        text,
+      })) as any;
+      if (error) throw new Error(error.message || 'Resend error');
     } catch (err) {
-      console.error('sendIntakeNotification error for', to, err);
+      console.error('sendIntakeNotification error for', recipient, err);
     }
   }
 }
@@ -168,20 +156,18 @@ export async function sendHtmlEmail(to: string[], subject: string, htmlContent: 
   const preheader = subject;
   const html = wrapHtml(htmlContent, subject, preheader);
   const text = htmlContent.replace(/<[^>]+>/g, '');
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    throw new Error(`SMTP credentials missing — EMAIL_USER: ${!!process.env.EMAIL_USER}, EMAIL_PASS: ${!!process.env.EMAIL_PASS}`);
-  }
-
-  const transporter = createTransporter();
+  if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is missing');
+  const resend = getResend();
   for (const t of to) {
     try {
-      await transporter.sendMail({
-        from: `CreateAccess <${process.env.EMAIL_USER}>`,
+      const { data, error } = (await resend.emails.send({
+        from: 'PartnerCRM <onboarding@resend.dev>',
         to: t,
         subject,
-        text,
         html,
-      });
+        text,
+      })) as any;
+      if (error) throw new Error(error.message || 'Resend error');
     } catch (err) {
       console.error('sendHtmlEmail error for', t, err);
     }
@@ -203,16 +189,14 @@ export async function sendEmailVerification(to: string, verifyUrl: string): Prom
   const html = wrapHtml(htmlBody, subject, 'Verify your CreateAccess email');
   const text = `Verify your CreateAccess email: ${verifyUrl}`;
 
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    throw new Error(`SMTP credentials missing — EMAIL_USER: ${!!process.env.EMAIL_USER}, EMAIL_PASS: ${!!process.env.EMAIL_PASS}`);
-  }
-
-  const transporter = createTransporter();
-  await transporter.sendMail({
-    from: process.env.NOTIFICATION_FROM_EMAIL || `CreateAccess <${process.env.EMAIL_USER}>`,
+  if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is missing');
+  const resend = getResend();
+  const { data, error } = (await resend.emails.send({
+    from: 'PartnerCRM <onboarding@resend.dev>',
     to,
     subject,
-    text,
     html,
-  });
+    text,
+  })) as any;
+  if (error) throw new Error(error.message || 'Resend error');
 }

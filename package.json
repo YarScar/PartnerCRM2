@@ -24,16 +24,15 @@
     "lucide-react": "^0.460.0",
     "marked": "^18.0.5",
     "next": "^16.2.6",
-    "nodemailer": "^9.0.1",
     "openai": "^6.44.0",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "resend": "^1.1.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/marked": "^5.0.2",
     "@types/node": "^22.9.0",
-    "@types/nodemailer": "^8.0.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "autoprefixer": "^10.4.20",
