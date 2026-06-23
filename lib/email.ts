@@ -178,3 +178,32 @@ export async function sendHtmlEmail(to: string[], subject: string, htmlContent: 
     }
   }
 }
+
+export async function sendEmailVerification(to: string, verifyUrl: string): Promise<void> {
+  const subject = 'Verify your email for CreateAccess';
+  const htmlBody = `
+    <h2 style="color:#1a1a1a;margin:0 0 8px">Verify your email address</h2>
+    <p style="color:#1a1a1a;line-height:1.4">Click the button below to verify your email for CreateAccess. The link will expire in 24 hours.</p>
+    <div style="margin:20px 0;text-align:center">
+      <a href="${verifyUrl}" style="background:#f97316;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600">Verify email</a>
+    </div>
+    <p style="color:#6b6b6b;font-size:13px">If the button doesn't work, copy and paste this link into your browser:</p>
+    <p style="color:#6b6b6b;font-size:13px;word-break:break-all">${verifyUrl}</p>
+  `;
+
+  const html = wrapHtml(htmlBody, subject, 'Verify your CreateAccess email');
+  const text = `Verify your CreateAccess email: ${verifyUrl}`;
+
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.error('SMTP credentials missing: EMAIL_USER or EMAIL_PASS');
+    return;
+  }
+
+  await transporter.sendMail({
+    from: process.env.NOTIFICATION_FROM_EMAIL || `CreateAccess <${process.env.EMAIL_USER}>`,
+    to,
+    subject,
+    text,
+    html,
+  });
+}
