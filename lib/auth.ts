@@ -69,6 +69,13 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
 export async function authenticate(username: string, password: string): Promise<AuthUser | null> {
   const account = await prisma.user.findUnique({
     where: { username: username.trim() },
+    select: {
+      id: true,
+      username: true,
+      password_hash: true,
+      display_name: true,
+      role: true,
+    },
   });
 
   if (!account) return null;
