@@ -7,7 +7,7 @@ function getResend() {
 }
 
 function wrapHtml(bodyHtml: string, title = 'CreateAccess Weekly Digest', preheader = '') {
-  // A simple responsive email template with a header, content card, and footer.
+  // A responsive, branded email template that matches the webapp styles.
   return `
     <!doctype html>
     <html>
@@ -15,21 +15,40 @@ function wrapHtml(bodyHtml: string, title = 'CreateAccess Weekly Digest', prehea
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <style>
-        /* Generic reset */
-        body { margin:0; padding:0; background:#f6f5f2; color:#111827; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
-        .container { max-width:720px; margin:24px auto; padding:16px; }
-        .card { background:#ffffff; border-radius:12px; padding:24px; box-shadow:0 8px 18px rgba(17,24,39,0.06); }
-        .header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
-        .brand { display:flex; gap:12px; align-items:center; }
-        .logo { width:44px; height:44px; border-radius:8px; background:linear-gradient(135deg,#f97316,#f59e0b); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; }
-        h1 { margin:0; font-size:20px; color:#0f172a; }
-        .subtitle { margin:4px 0 0; color:#6b7280; font-size:13px }
-        .content { margin-top:12px; color:#0f172a; line-height:1.55; }
-        .footer { margin-top:18px; color:#6b7280; font-size:13px; }
-        .cta { display:inline-block; background:#0ea5a3; color:#fff; padding:10px 14px; border-radius:8px; text-decoration:none; font-weight:600 }
+        /* Reset & base */
+        body { margin:0; padding:0; background:#faf7f0; color:#0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+        .container { max-width:720px; margin:28px auto; padding:18px; }
+        .card { background:#ffffff; border-radius:14px; padding:28px; box-shadow:0 10px 30px rgba(13,22,26,0.06); border:1px solid rgba(14,20,24,0.03); }
+
+        /* Header */
+        .header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; }
+        .brand { display:flex; gap:14px; align-items:center; }
+        .logo { width:48px; height:48px; border-radius:10px; background:linear-gradient(135deg,#e85d3c,#c2421f); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-family: 'Fraunces', Georgia, serif; font-size:18px }
+        h1 { margin:0; font-size:20px; color:#0a0a0a; letter-spacing:-0.2px }
+        .subtitle { margin:4px 0 0; color:#4b5563; font-size:13px }
+        .date { color:#6b7280; font-size:13px; text-align:right }
+
+        /* Content styles (markdown-generated) */
+        .content { margin-top:14px; color:#0a0a0a; line-height:1.6; font-size:15px }
+        .content h2 { color:#e85d3c; font-size:16px; margin:18px 0 8px; }
+        .content h3 { color:#0a0a0a; margin:12px 0 6px }
+        .content p { margin:8px 0 }
+        .content ul { margin:8px 0 16px 20px; }
+        .content li { margin:8px 0; }
+        .stat { display:inline-block; background:#f7f5f0; padding:10px 12px; border-radius:8px; border:1px solid rgba(14,20,24,0.04); font-weight:600; color:#0a0a0a }
+
+        /* CTA */
+        .cta { display:inline-block; background:#e85d3c; color:#fff; padding:10px 16px; border-radius:10px; text-decoration:none; font-weight:700 }
+
+        /* Footer */
+        .footer { margin-top:20px; color:#6b7280; font-size:13px; }
+        .small { color:#9ca3af; font-size:12px }
+
         @media (max-width:600px) {
           .container { padding:12px; }
-          .card { padding:16px; }
+          .card { padding:18px; }
+          .header { flex-direction:column; align-items:flex-start }
+          .date { text-align:left }
         }
       </style>
     </head>
@@ -44,7 +63,7 @@ function wrapHtml(bodyHtml: string, title = 'CreateAccess Weekly Digest', prehea
                 ${preheader ? `<div class="subtitle">${preheader}</div>` : ''}
               </div>
             </div>
-            <div style="text-align:right;color:#6b7280;font-size:12px">${new Date().toLocaleDateString('en-US')}</div>
+            <div class="date">${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
           </div>
 
           <div class="content">
@@ -53,7 +72,7 @@ function wrapHtml(bodyHtml: string, title = 'CreateAccess Weekly Digest', prehea
 
           <div class="footer">
             <p style="margin:12px 0 0">Thanks — the CreateAccess team</p>
-            <p style="margin:6px 0 0;color:#9ca3af;font-size:12px">If you no longer wish to receive these emails, update your notification preferences in the dashboard.</p>
+            <p class="small" style="margin:6px 0 0">If you no longer wish to receive these emails, update your notification preferences in the dashboard.</p>
           </div>
         </div>
       </div>
