@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
     if (!user || !isAdmin(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const data = await getDigestData();
+    // Turn the digest into a safer summary before sending it to the AI.
     const aiData = sanitizeDigestForAI(data);
 
     if (!process.env.OPENAI_API_KEY) {
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
 
     const system = `You are a program coordinator assistant for CreateAccess, a nonprofit that brings basketball and technology programs to youth organizations. Write in a warm, encouraging, professional tone. Be concise — one sentence per bullet point.`;
 
+    // Send only safe, summary-style info to the AI.
     const userPrompt = `Generate a weekly partnership digest using only aggregated, non-identifying data. Today is ${new Date().toDateString()}.
 
 New inquiries this week: ${aiData.newIntakesCount}

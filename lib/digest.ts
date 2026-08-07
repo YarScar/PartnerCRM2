@@ -17,6 +17,8 @@ export type DigestAIData = {
   statusChangeSummary: Array<{ status: string; count: number }>;
 };
 
+// This keeps the AI summary simple and safer.
+// We do not send partner names or personal details.
 export function sanitizeDigestForAI(data: DigestData): DigestAIData {
   const statusCounts = data.statusChanges.reduce<Record<string, number>>((acc, item) => {
     acc[item.status] = (acc[item.status] || 0) + 1;
@@ -27,6 +29,7 @@ export function sanitizeDigestForAI(data: DigestData): DigestAIData {
     .map(([status, count]) => ({ status, count }))
     .sort((a, b) => b.count - a.count || a.status.localeCompare(b.status));
 
+  // We only send counts and broad status groups to the AI.
   return {
     newIntakesCount: data.newIntakes.length,
     statusChangesCount: data.statusChanges.length,
