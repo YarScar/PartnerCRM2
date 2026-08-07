@@ -8,6 +8,35 @@ export type DigestData = {
   totalActive: number;
 };
 
+export type DigestAIData = {
+  newIntakesCount: number;
+  statusChangesCount: number;
+  upcomingTimelineCount: number;
+  quietPartnersCount: number;
+  totalActive: number;
+  statusChangeSummary: Array<{ status: string; count: number }>;
+};
+
+export function sanitizeDigestForAI(data: DigestData): DigestAIData {
+  const statusCounts = data.statusChanges.reduce<Record<string, number>>((acc, item) => {
+    acc[item.status] = (acc[item.status] || 0) + 1;
+    return acc;
+  }, {});
+
+  const statusChangeSummary = Object.entries(statusCounts)
+    .map(([status, count]) => ({ status, count }))
+    .sort((a, b) => b.count - a.count || a.status.localeCompare(b.status));
+
+  return {
+    newIntakesCount: data.newIntakes.length,
+    statusChangesCount: data.statusChanges.length,
+    upcomingTimelineCount: data.upcomingTimelines.length,
+    quietPartnersCount: data.quietPartners.length,
+    totalActive: data.totalActive,
+    statusChangeSummary,
+  };
+}
+
 export async function getDigestData(): Promise<DigestData> {
   const now = new Date();
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { getSessionFromToken, isAdmin, SESSION_COOKIE_NAME } from '@/lib/auth';
-import { getDigestData } from '@/lib/digest';
+import { getDigestData, sanitizeDigestForAI } from '@/lib/digest';
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
     if (!user || !isAdmin(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const data = await getDigestData();
+    const aiData = sanitizeDigestForAI(data);
 
     if (!process.env.OPENAI_API_KEY) {
       console.error('OPENAI_API_KEY missing in environment');
@@ -20,13 +21,14 @@ export async function GET(req: NextRequest) {
 
     const system = `You are a program coordinator assistant for CreateAccess, a nonprofit that brings basketball and technology programs to youth organizations. Write in a warm, encouraging, professional tone. Be concise — one sentence per bullet point.`;
 
-    const userPrompt = `Generate a weekly partnership digest. Today is ${new Date().toDateString()}.
+    const userPrompt = `Generate a weekly partnership digest using only aggregated, non-identifying data. Today is ${new Date().toDateString()}.
 
-New inquiries this week: ${JSON.stringify(data.newIntakes)}
-Partners with updates: ${JSON.stringify(data.statusChanges)}
-Timelines coming up (next 30 days): ${JSON.stringify(data.upcomingTimelines)}
-Active partners gone quiet (14+ days no activity): ${JSON.stringify(data.quietPartners)}
-Total active partners: ${data.totalActive}
+New inquiries this week: ${aiData.newIntakesCount}
+Partners with updates this week: ${aiData.statusChangesCount}
+Timelines coming up (next 30 days): ${aiData.upcomingTimelineCount}
+Active partners needing follow-up: ${aiData.quietPartnersCount}
+Total active partners: ${aiData.totalActive}
+Status change breakdown: ${JSON.stringify(aiData.statusChangeSummary)}
 
 Write the digest using exactly these markdown sections:
 ## 🆕 New Inquiries This Week
