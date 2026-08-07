@@ -8,16 +8,19 @@ type RateLimitEntry = {
 const limitStore = new Map<string, RateLimitEntry>();
 
 function getClientIdentifier(req: NextRequest, prefix: string) {
+  // Use IP-ish info so one client cannot spam the same action forever.
   const forwarded = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   const ip = forwarded || req.headers.get('x-real-ip') || 'unknown';
   return `${prefix}:${ip}`;
 }
 
 export function getRateLimitKey(req: NextRequest, prefix: string) {
+  // Prefix keeps each endpoint separate in the in-memory store.
   return getClientIdentifier(req, prefix);
 }
 
 export function checkRateLimit(key: string, limit = 5, windowMs = 15 * 60 * 1000) {
+  // This is a simple in-memory limit, which is enough for a small app.
   const now = Date.now();
   const entry = limitStore.get(key);
 

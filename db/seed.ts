@@ -56,6 +56,7 @@ async function main() {
     throw new Error('DATABASE_URL not set.');
   }
 
+  // Make sure the lookup tables exist before the app starts using them.
   for (const status of STATUSES) {
     await prisma.partnerStatus.upsert({
       where: { label: status.label },
@@ -67,6 +68,7 @@ async function main() {
     });
   }
 
+  // Seed the default login accounts so the app is usable right away.
   for (const account of DEFAULT_ACCOUNTS) {
     const passwordHash = await hashPassword(account.password);
     await prisma.user.upsert({
@@ -85,6 +87,7 @@ async function main() {
     });
   }
 
+  // Copy the mock data into the real database so local and demo data look the same.
   for (const partner of mockPartners) {
     await prisma.partner.upsert({
       where: { id: partner.id },
@@ -102,6 +105,7 @@ async function main() {
     });
   }
 
+  // Seed notes last so the partner records already exist.
   for (const note of mockNotes) {
     await prisma.partnerNote.upsert({
       where: { id: note.id },

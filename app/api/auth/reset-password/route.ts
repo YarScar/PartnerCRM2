@@ -6,6 +6,7 @@ import { logAuditEvent } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
   try {
+    // This is another high-value route, so it gets the same simple rate limit.
     const rateLimitKey = getRateLimitKey(req, 'reset-password');
     const rateLimit = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
     if (!rateLimit.allowed) {
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     const changed = await changePassword(user.username, password);
+    // Once the password is changed, the token should never be usable again.
     await logAuditEvent('reset_password.completed', { username: user.username });
 
     // mark token used

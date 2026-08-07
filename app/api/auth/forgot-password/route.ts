@@ -7,6 +7,7 @@ import { logAuditEvent } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
   try {
+    // Keep this endpoint from being spammed.
     const rateLimitKey = getRateLimitKey(req, 'forgot-password');
     const rateLimit = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
     if (!rateLimit.allowed) {
@@ -23,8 +24,10 @@ export async function POST(req: NextRequest) {
     const user = await prisma.user.findFirst({ where: { username: { equals: normalized, mode: 'insensitive' } } });
 
     if (user) {
+      // Track that a reset was requested without exposing the token itself.
       await logAuditEvent('forgot_password.requested', { username: user.username });
       try {
+        // The token is random and only works once.
         const token = crypto.randomBytes(32).toString('hex');
         const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
         await (prisma as any).passwordResetToken.create({
@@ -37,6 +40,7 @@ export async function POST(req: NextRequest) {
 
         const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
         try {
+          // The email just carries the reset link, nothing else.
           await sendPasswordResetEmail(normalized, resetUrl);
         } catch (err) {
           console.error('sendPasswordResetEmail failed for', normalized, err);

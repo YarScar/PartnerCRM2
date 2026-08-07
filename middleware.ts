@@ -14,6 +14,7 @@ const PUBLIC_PATHS = [
 ];
 
 function isProtectedPath(pathname: string) {
+  // These are the parts of the app that should never be public.
   return (
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/partners') ||
@@ -23,6 +24,7 @@ function isProtectedPath(pathname: string) {
 }
 
 function applySecurityHeaders(response: NextResponse) {
+  // Basic browser hardening so the app behaves more like a production app.
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -40,13 +42,16 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (PUBLIC_PATHS.includes(pathname) || pathname.startsWith('/_next') || pathname === '/favicon.ico') {
+    // Even public pages still get the safe headers.
     return applySecurityHeaders(NextResponse.next());
   }
 
   if (!isProtectedPath(pathname)) {
+    // Let unrelated routes pass through, but keep the same header protection.
     return applySecurityHeaders(NextResponse.next());
   }
 
+  // Protected routes need a valid session before they can load.
   const user = await getSessionFromToken(request.cookies.get(SESSION_COOKIE_NAME)?.value);
   if (!user) {
     if (pathname.startsWith('/api/')) {
@@ -60,6 +65,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith('/admin') && !isAdmin(user)) {
+    // Staff can still use the app, but only admins can open admin pages.
     if (pathname.startsWith('/api/')) {
       return applySecurityHeaders(NextResponse.json({ error: 'Forbidden' }, { status: 403 }));
     }

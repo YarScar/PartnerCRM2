@@ -20,6 +20,7 @@ export type DigestAIData = {
 // This keeps the AI summary simple and safer.
 // We do not send partner names or personal details.
 export function sanitizeDigestForAI(data: DigestData): DigestAIData {
+  // Count each status so the summary can talk about trends instead of names.
   const statusCounts = data.statusChanges.reduce<Record<string, number>>((acc, item) => {
     acc[item.status] = (acc[item.status] || 0) + 1;
     return acc;
@@ -41,6 +42,7 @@ export function sanitizeDigestForAI(data: DigestData): DigestAIData {
 }
 
 export async function getDigestData(): Promise<DigestData> {
+  // Pull only the parts we need for the weekly digest.
   const now = new Date();
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -83,6 +85,7 @@ export async function getDigestData(): Promise<DigestData> {
   const activePartners = await prisma.partner.findMany({ where: { status: 'Active Partner' }, include: { notes: { orderBy: { created_at: 'desc' }, take: 1 } } });
   const quietPartners = activePartners
     .map((p) => {
+      // If there is no recent note, this partner should show up for follow-up.
       const lastNote = p.notes && p.notes.length > 0 ? p.notes[0].created_at : null;
       return { organizationName: p.org_name, contactName: p.contact_name || undefined, lastNoteAt: lastNote };
     })

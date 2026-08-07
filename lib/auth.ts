@@ -14,7 +14,9 @@ export interface SessionPayload extends AuthUser {
 }
 
 export const SESSION_COOKIE_NAME = 'createaccess_session';
+// Keep sessions alive for a week so staff do not have to log in constantly.
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
+// Use a real secret in production. The dev fallback keeps local work simple.
 const AUTH_SECRET = process.env.AUTH_SECRET || process.env.NEXT_PUBLIC_AUTH_SECRET || 'createaccess-dev-secret';
 const SALT_ROUNDS = 12;
 
@@ -39,18 +41,21 @@ async function importKey() {
 }
 
 async function signPayload(payload: string) {
+  // Sign the session so the browser cannot tamper with it.
   const key = await importKey();
   const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
   return toBase64Url(String.fromCharCode(...new Uint8Array(signature)));
 }
 
 async function verifySignature(payload: string, signature: string) {
+  // Check that the token was really created by this app.
   const key = await importKey();
   const signatureBytes = Uint8Array.from(fromBase64Url(signature), (char) => char.charCodeAt(0));
   return crypto.subtle.verify('HMAC', key, signatureBytes, new TextEncoder().encode(payload));
 }
 
 async function hashLegacyPassword(password: string): Promise<string> {
+  // This matches the older password format so existing accounts still work.
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
   const digest = await crypto.subtle.digest('SHA-256', data);
@@ -58,6 +63,7 @@ async function hashLegacyPassword(password: string): Promise<string> {
 }
 
 export async function hashPassword(password: string): Promise<string> {
+  // New passwords are hashed with bcrypt instead of the older SHA-256 helper.
   const bcrypt = (await import('bcryptjs')).default as typeof import('bcryptjs');
   return bcrypt.hash(password, SALT_ROUNDS);
 }
@@ -66,10 +72,12 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   if (!hash) return false;
 
   if (hash.startsWith('$2')) {
+    // bcrypt hashes start with $2, so we can compare them directly.
     const bcrypt = (await import('bcryptjs')).default as typeof import('bcryptjs');
     return bcrypt.compare(password, hash);
   }
 
+  // If a record still has an old hash, compare it the old way.
   const legacyHash = await hashLegacyPassword(password);
   return legacyHash === hash;
 }
@@ -80,6 +88,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
  * For production, use bcrypt or similar with salt rounds.
  */
 export async function authenticate(username: string, password: string): Promise<AuthUser | null> {
+  // Look up the account first, then compare the password.
   const account = await prisma.user.findUnique({
     where: { username: username.trim() },
     select: {
@@ -107,6 +116,7 @@ export async function authenticate(username: string, password: string): Promise<
  * Change password for authenticated user using database.
  */
 export async function changePassword(username: string, newPassword: string): Promise<boolean> {
+  // Re-hash the new password before storing it.
   const passwordHash = await hashPassword(newPassword);
 
   try {
@@ -121,6 +131,7 @@ export async function changePassword(username: string, newPassword: string): Pro
 }
 
 export async function createSessionToken(user: AuthUser): Promise<string> {
+  // Put the user info into a signed token for the session cookie.
   const payload: SessionPayload = {
     ...user,
     exp: Date.now() + SESSION_TTL_MS,
@@ -135,6 +146,7 @@ export async function getSessionFromToken(token?: string | null): Promise<AuthUs
   const [encodedPayload, signature] = token.split('.');
   if (!encodedPayload || !signature) return null;
 
+  // If the signature fails, treat the token like it never existed.
   const valid = await verifySignature(encodedPayload, signature);
   if (!valid) return null;
 
@@ -153,5 +165,6 @@ export async function getSessionFromToken(token?: string | null): Promise<AuthUs
 }
 
 export function isAdmin(user: AuthUser | null | undefined) {
+  // Tiny helper so admin checks stay readable everywhere else.
   return user?.role === 'admin';
 }

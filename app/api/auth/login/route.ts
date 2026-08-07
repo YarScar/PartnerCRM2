@@ -6,6 +6,7 @@ import { logAuditEvent } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
   try {
+    // Slow down repeated login attempts from the same client.
     const rateLimitKey = getRateLimitKey(req, 'login');
     const rateLimit = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
     if (!rateLimit.allowed) {
@@ -17,13 +18,16 @@ export async function POST(req: NextRequest) {
     const user = await authenticate(String(username || ''), String(password || ''));
 
     if (!user) {
+      // Keep the error message vague so it does not reveal which field was wrong.
       await logAuditEvent('login.failed', { username: String(username || '') });
       return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 });
     }
 
+    // Successful logins also get recorded for traceability.
     await logAuditEvent('login.success', { username: user.username });
 
     const response = NextResponse.json({ user });
+    // Stop the browser from caching sensitive login responses.
     response.headers.set('Cache-Control', 'no-store');
     response.cookies.set({
       name: 'createaccess_session',
