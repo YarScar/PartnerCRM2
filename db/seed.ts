@@ -1,8 +1,8 @@
 import 'dotenv/config';
-import { createHash } from 'crypto';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { mockNotes, mockPartners } from '../lib/mock-data';
 import { toPrismaData } from '../lib/partners';
+import { hashPassword } from '../lib/auth';
 
 const prisma = new PrismaClient();
 
@@ -30,10 +30,6 @@ const DEFAULT_ACCOUNTS = [
     password: process.env.STAFF_ACCOUNT_PASSWORD || 'staff123',
   },
 ];
-
-function hashPassword(password: string) {
-  return createHash('sha256').update(password).digest('base64');
-}
 
 /**
  * Resets auto-increment sequence for a table.
@@ -72,18 +68,19 @@ async function main() {
   }
 
   for (const account of DEFAULT_ACCOUNTS) {
+    const passwordHash = await hashPassword(account.password);
     await prisma.user.upsert({
       where: { username: account.username },
       update: {
         display_name: account.display_name,
         role: account.role,
-        password_hash: hashPassword(account.password),
+        password_hash: passwordHash,
       },
       create: {
         username: account.username,
         display_name: account.display_name,
         role: account.role,
-        password_hash: hashPassword(account.password),
+        password_hash: passwordHash,
       },
     });
   }

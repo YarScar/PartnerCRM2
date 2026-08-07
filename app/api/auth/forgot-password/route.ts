@@ -2,9 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/db';
 import { sendPasswordResetEmail } from '@/lib/email';
+import { checkRateLimit, getRateLimitKey } from '@/lib/rateLimit';
+import { logAuditEvent } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
   try {
+    const rateLimitKey = getRateLimitKey(req, 'forgot-password');
+    const rateLimit = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      await logAuditEvent('forgot_password.rate_limited', { key: rateLimitKey });
+      return NextResponse.json({ ok: true }, { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimit.retryAfterMs || 0) / 1000)) } });
+    }
+
     const { email } = await req.json();
     if (!email || typeof email !== 'string') return NextResponse.json({ ok: true });
 
@@ -14,6 +23,7 @@ export async function POST(req: NextRequest) {
     const user = await prisma.user.findFirst({ where: { username: { equals: normalized, mode: 'insensitive' } } });
 
     if (user) {
+      await logAuditEvent('forgot_password.requested', { username: user.username });
       try {
         const token = crypto.randomBytes(32).toString('hex');
         const expiresAt = new Date(Date.now() + 60 * 60 * 1000);

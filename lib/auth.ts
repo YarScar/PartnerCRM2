@@ -15,7 +15,8 @@ export interface SessionPayload extends AuthUser {
 
 export const SESSION_COOKIE_NAME = 'createaccess_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
-const AUTH_SECRET = process.env.AUTH_SECRET || 'createaccess-dev-secret';
+const AUTH_SECRET = process.env.AUTH_SECRET || process.env.NEXT_PUBLIC_AUTH_SECRET || 'createaccess-dev-secret';
+const SALT_ROUNDS = 12;
 
 function toBase64Url(value: string) {
   return btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
@@ -49,16 +50,28 @@ async function verifySignature(payload: string, signature: string) {
   return crypto.subtle.verify('HMAC', key, signatureBytes, new TextEncoder().encode(payload));
 }
 
-async function hashPassword(password: string): Promise<string> {
+async function hashLegacyPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)));
 }
 
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const computed = await hashPassword(password);
-  return computed === hash;
+export async function hashPassword(password: string): Promise<string> {
+  const bcrypt = (await import('bcryptjs')).default as typeof import('bcryptjs');
+  return bcrypt.hash(password, SALT_ROUNDS);
+}
+
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  if (!hash) return false;
+
+  if (hash.startsWith('$2')) {
+    const bcrypt = (await import('bcryptjs')).default as typeof import('bcryptjs');
+    return bcrypt.compare(password, hash);
+  }
+
+  const legacyHash = await hashLegacyPassword(password);
+  return legacyHash === hash;
 }
 
 /**

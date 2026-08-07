@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { changePassword } from '@/lib/auth';
+import { checkRateLimit, getRateLimitKey } from '@/lib/rateLimit';
+import { logAuditEvent } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
   try {
+    const rateLimitKey = getRateLimitKey(req, 'reset-password');
+    const rateLimit = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      await logAuditEvent('reset_password.rate_limited', { key: rateLimitKey });
+      return NextResponse.json({ error: 'Too many attempts. Please try again later.' }, { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimit.retryAfterMs || 0) / 1000)) } });
+    }
+
     const { token, password } = await req.json();
     if (!token || !password || typeof token !== 'string' || typeof password !== 'string') {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
@@ -26,6 +35,7 @@ export async function POST(req: NextRequest) {
     }
 
     const changed = await changePassword(user.username, password);
+    await logAuditEvent('reset_password.completed', { username: user.username });
 
     // mark token used
     await (prisma as any).passwordResetToken.update({ where: { token }, data: { used: true } });
