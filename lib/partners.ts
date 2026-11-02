@@ -139,49 +139,54 @@ function normalizePartnerKeys(data: Partial<Partner>): Partial<Partner> {
   return out as Partial<Partner>;
 }
 
+// Partner columns a form can write directly. Any other answer (a field an admin
+// added in the form builder) is kept in the `properties` JSON column.
+// Never stored as answers: ids/timestamps, and the aliases normalizePartnerKeys maps.
+const IGNORED_KEYS = new Set(['id', 'created_at', 'updated_at', 'notes', 'properties', 'name', 'organization', 'org', 'email', 'phone', 'contact', 'message']);
+
+const KNOWN_PARTNER_KEYS = new Set([
+  'org_name',
+  'contact_name',
+  'contact_email',
+  'contact_phone',
+  'contact_role',
+  'org_website',
+  'org_address',
+  'org_city',
+  'org_state',
+  'status',
+  'program_structure',
+  'who_they_work_with',
+  'youth_ages',
+  'how_kids_connect',
+  'intake_message',
+  'recruitment_needed',
+  'recruitment_notes',
+  'program_times',
+  'schedule_flexibility',
+  'desired_program_type',
+  'specific_project_request',
+  'wants_recommendations',
+  'desired_timeline',
+  'firm_dates',
+  'works_with_3d_tech',
+  'three_d_tech_specifics',
+  'hardware_inventory',
+  'hardware_notes',
+  'available_computers',
+  'internet_availability',
+  'available_space',
+  'on_site_assistance',
+  'on_site_assistance_notes',
+  'accessibility_limitations',
+  'general_tech_context',
+  'source',
+]);
+
 function toPrismaUpdateData(data: Partial<Partner>): Prisma.PartnerUncheckedUpdateInput {
   const out: Prisma.PartnerUncheckedUpdateInput = {};
   const props: Record<string, unknown> = {};
 
-  // Known top-level partner columns that can be directly updated
-  const knownKeys = new Set([
-    'org_name',
-    'contact_name',
-    'contact_email',
-    'contact_phone',
-    'contact_role',
-    'org_website',
-    'org_address',
-    'org_city',
-    'org_state',
-    'status',
-    'program_structure',
-    'who_they_work_with',
-    'youth_ages',
-    'how_kids_connect',
-    'intake_message',
-    'recruitment_needed',
-    'recruitment_notes',
-    'program_times',
-    'schedule_flexibility',
-    'desired_program_type',
-    'specific_project_request',
-    'wants_recommendations',
-    'desired_timeline',
-    'firm_dates',
-    'works_with_3d_tech',
-    'three_d_tech_specifics',
-    'hardware_inventory',
-    'hardware_notes',
-    'available_computers',
-    'internet_availability',
-    'available_space',
-    'on_site_assistance',
-    'on_site_assistance_notes',
-    'accessibility_limitations',
-    'general_tech_context',
-    'source',
-  ]);
 
   for (const [key, value] of Object.entries(data)) {
     if (value === undefined) continue;
@@ -192,7 +197,7 @@ function toPrismaUpdateData(data: Partial<Partner>): Prisma.PartnerUncheckedUpda
       continue;
     }
 
-    if (knownKeys.has(key)) {
+    if (KNOWN_PARTNER_KEYS.has(key)) {
       (out as Record<string, unknown>)[key] = value;
       continue;
     }
@@ -234,8 +239,24 @@ export async function createPartner(data: Partial<Partner>): Promise<Partner> {
   const normalized = normalizePartnerKeys(data);
   if (!hasDb()) return addMockPartner(normalized);
 
+  // Answers to fields added in the form builder have no column of their own: keep them
+  // in `properties` instead of dropping them.
+  const extra: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(normalized)) {
+    if (value === undefined || value === null || value === '') continue;
+    if (KNOWN_PARTNER_KEYS.has(key) || IGNORED_KEYS.has(key)) continue;
+    extra[key] = value;
+  }
+  const createData = toPrismaData(normalized);
+  if (Object.keys(extra).length > 0) {
+    createData.properties = {
+      ...((createData.properties as Record<string, unknown>) ?? {}),
+      ...extra,
+    } as Prisma.InputJsonValue;
+  }
+
   const created = await prisma.partner.create({
-    data: toPrismaData(normalized),
+    data: createData,
     include: { notes: { orderBy: { created_at: 'desc' } } },
   });
   return mapPartner(created);
