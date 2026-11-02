@@ -2,6 +2,9 @@
   "name": "createaccess",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "prisma": {
     "seed": "tsx db/seed.ts"
   },
@@ -10,13 +13,14 @@
     "postinstall": "prisma generate",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "dev:light": "node --max-old-space-size=2048 ./node_modules/.bin/next dev --turbo",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:email": "node ./scripts/test-email.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:push": "prisma db push",
+    "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx db/seed.ts"
   },
   "dependencies": {
@@ -26,7 +30,7 @@
     "next": "^16.2.6",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "resend": "^1.1.0"
+    "resend": "^6.37.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -35,6 +39,8 @@
     "@types/react-dom": "^19.0.0",
     "autoprefixer": "^10.4.20",
     "dotenv": "^16.4.5",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.2.6",
     "postcss": "^8.5.14",
     "prisma": "^6.8.2",
     "tailwindcss": "^3.4.15",

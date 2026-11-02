@@ -6,3 +6,7 @@ node_modules
 .DS_Store
 dist
 build
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+.env*.local

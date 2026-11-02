@@ -194,7 +194,7 @@ export function PartnerForm({ partner, mode }: Props) {
         <div className="text-6xl mb-4">🏀</div>
         <h2 className="font-display text-3xl font-bold mb-2">Thanks for reaching out!</h2>
         <p className="text-ink/60 max-w-md mx-auto">
-          We've received your information. A member of the CreateAccess team will be in touch soon.
+          We’ve received your information. A member of the CreateAccess team will be in touch soon.
         </p>
       </div>
     );

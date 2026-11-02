@@ -1,5 +1,4 @@
 import { Resend } from 'resend';
-import ensureEnvLoaded from './loadEnv';
 
 // Resend's shared test sender only delivers to the Resend account owner's own
 // address, so production must send from a domain verified in Resend (EMAIL_FROM).
@@ -8,7 +7,6 @@ const DEV_FALLBACK_FROM = 'PartnerCRM <onboarding@resend.dev>';
 export type SendResult = { sent: string[]; failed: { to: string; error: string }[] };
 
 function getResend() {
-  ensureEnvLoaded();
   if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is missing');
   return new Resend(process.env.RESEND_API_KEY);
 }

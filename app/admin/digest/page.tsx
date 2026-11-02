@@ -1,33 +1,52 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+
+type DigestResult = { html: string; data: unknown } | { error: string };
+
+async function fetchDigest(): Promise<DigestResult> {
+  try {
+    const res = await fetch('/api/digest');
+    const body = await res.json();
+    if (!res.ok) return { error: body.error || 'Failed to generate digest' };
+    return { html: body.html || '', data: body.data ?? null };
+  } catch (err: any) {
+    return { error: err?.message || 'Failed to generate digest' };
+  }
+}
 
 export default function AdminDigestPage() {
   // Built and escaped on the server by lib/digest.ts renderDigest (same as the email).
   const [html, setHtml] = useState('');
   const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/digest');
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || 'Failed to generate digest');
-      setHtml(body.html || '');
-      setData(body.data || null);
-    } catch (err: any) {
-      setToast({ type: 'error', msg: err?.message || 'Failed to generate digest' });
+  const apply = useCallback((result: DigestResult) => {
+    if ('error' in result) setToast({ type: 'error', msg: result.error });
+    else {
+      setHtml(result.html);
+      setData(result.data);
     }
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
-    load();
-  }, []);
+    let cancelled = false;
+    fetchDigest().then((result) => {
+      if (!cancelled) apply(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [apply]);
+
+  const load = () => {
+    setLoading(true);
+    fetchDigest().then(apply);
+  };
 
   const handleSend = async () => {
     setSending(true);

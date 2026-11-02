@@ -96,9 +96,8 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 }
 
 /**
- * Authenticate user with database-backed credentials.
- * IMPORTANT: Passwords are hashed using SHA-256 (suitable for development).
- * For production, use bcrypt or similar with salt rounds.
+ * Authenticate user with database-backed credentials (bcrypt; old SHA-256 hashes are
+ * still accepted and upgraded on the next successful login).
  */
 export async function authenticate(username: string, password: string): Promise<AuthUser | null> {
   // Look up the account first, then compare the password.
@@ -117,6 +116,11 @@ export async function authenticate(username: string, password: string): Promise<
 
   const passwordValid = await verifyPassword(password, account.password_hash);
   if (!passwordValid) return null;
+
+  // Upgrade an old unsalted SHA-256 hash to bcrypt now that we have the plain password.
+  if (!account.password_hash.startsWith('$2')) {
+    await changePassword(account.username, password);
+  }
 
   return {
     username: account.username,
@@ -149,7 +153,9 @@ export async function createSessionToken(user: AuthUser): Promise<string> {
     ...user,
     exp: Date.now() + SESSION_TTL_MS,
   };
-  const encodedPayload = toBase64Url(JSON.stringify(payload));
+  // btoa only takes Latin-1, so encode the JSON as UTF-8 bytes first: a display name
+  // like "José" or "Nguyễn" would otherwise make login throw.
+  const encodedPayload = toBase64Url(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(payload))));
   const signature = await signPayload(encodedPayload);
   return `${encodedPayload}.${signature}`;
 }
@@ -159,12 +165,11 @@ export async function getSessionFromToken(token?: string | null): Promise<AuthUs
   const [encodedPayload, signature] = token.split('.');
   if (!encodedPayload || !signature) return null;
 
-  // If the signature fails, treat the token like it never existed.
-  const valid = await verifySignature(encodedPayload, signature);
-  if (!valid) return null;
-
   try {
-    const payload = JSON.parse(fromBase64Url(encodedPayload)) as SessionPayload;
+    // If the signature fails (or isn't even valid base64), treat the token like it never existed.
+    if (!(await verifySignature(encodedPayload, signature))) return null;
+    const bytes = Uint8Array.from(fromBase64Url(encodedPayload), (char) => char.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder().decode(bytes)) as SessionPayload;
     if (!payload.exp || payload.exp < Date.now()) return null;
     return {
       username: payload.username,

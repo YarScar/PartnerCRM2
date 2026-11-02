@@ -405,7 +405,7 @@ export default function AdminPage() {
             <div className="divide-y divide-ink/10">
               {section.fields.length === 0 ? (
                 <div className="px-5 py-8 text-center text-sm text-ink/40 italic">
-                  No fields. Click "+ Field" to add one.
+                  No fields. Click “+ Field” to add one.
                 </div>
               ) : (
                 section.fields.map((field) => (

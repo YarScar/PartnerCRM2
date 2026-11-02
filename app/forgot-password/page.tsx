@@ -30,7 +30,7 @@ export default function ForgotPasswordPage() {
         <h2 className="font-display text-2xl font-bold mb-2">Forgot your password?</h2>
         {!sent ? (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <p className="text-sm text-ink/70">Enter your email and we'll send a password reset link if it's on file.</p>
+            <p className="text-sm text-ink/70">Enter your email and we’ll send a password reset link if it’s on file.</p>
             <label className="block">
               <span className="label-base">Email</span>
               <input

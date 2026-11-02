@@ -40,7 +40,20 @@ Open [http://localhost:3000](http://localhost:3000). The app runs out of the box
   ```
 6. Restart `npm run dev`. The dashboard now shows a "Connected to Neon Postgres" indicator and writes to your database.
 
-When `DATABASE_URL` is unset, the app transparently falls back to the in-memory mock store at `lib/mock-data.ts`.
+When `DATABASE_URL` is unset in local development, the app falls back to the in-memory mock store at `lib/mock-data.ts`. Production refuses to start without it.
+
+`npm run db:migrate` (`prisma migrate dev`) is for creating migrations against a development database only. To apply committed migrations to the production database, run `npm run db:deploy` (`prisma migrate deploy`) with the production `DATABASE_URL`, before deploying code that needs them.
+
+## Checks
+
+| Command | What it does |
+|---|---|
+| `npm run lint` | ESLint (Next.js rules) |
+| `npm run typecheck` | TypeScript, no output |
+| `npm test` | Unit tests (`tests/*.test.ts`, Node's built-in test runner) |
+| `npm run build` | Production build |
+
+GitHub Actions (`.github/workflows/ci.yml`) runs all four, plus `prisma validate`, on every pull request and push to `main`. Vercel builds a preview of every pull request; use it to check anything that needs the real database or email before merging. Dependabot opens weekly pull requests for dependency updates.
 
 ## Project structure
 
@@ -63,11 +76,11 @@ lib/
   types.ts                 — Partner, PartnerStatus, HARDWARE_CHECKLIST, etc.
   mock-data.ts             — seed data + in-memory CRUD for prototype mode
 db/
-  schema.sql               — PostgreSQL schema (partners, notes, statuses, form_config)
-  init.ts                  — Prisma setup helper (status upserts)
-  seed.ts                  — seeds default status labels/colors
+  seed.ts                  — seeds statuses, the admin/staff accounts and sample partners
 prisma/
-  schema.prisma            — Prisma models mapped to existing SQL tables
+  schema.prisma            — the database schema (source of truth)
+  migrations/              — every schema change, applied with `prisma migrate deploy`
+tests/                     — unit tests (`npm test`)
 ```
 
 ## Features (mapping back to your README)

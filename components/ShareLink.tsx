@@ -1,20 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
+
+const noSubscribe = () => () => {};
 
 export function ShareLink({ path = '/intake' }: { path?: string }) {
-  const [url, setUrl] = useState('');
+  // The site's own origin is only known in the browser; the server renders the bare path.
+  const origin = useSyncExternalStore(noSubscribe, () => window.location.origin.replace(/\/+$/, ''), () => '');
+  // Default to the public-facing intake path
+  const url = origin + (path || '/public/intake');
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    try {
-      // Default to the public-facing intake path
-      const resolved = path || '/public/intake';
-      setUrl(window.location.origin.replace(/\/+$/, '') + resolved);
-    } catch {
-      setUrl(path);
-    }
-  }, [path]);
 
   const copy = async () => {
     try {
