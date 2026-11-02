@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, BadgeCheck, Lock, Loader2, UserRound } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, ChevronRight, ClipboardList, FileEdit, Lock, Loader2, UserRound } from 'lucide-react';
 
 export function SettingsClient({
   user,
@@ -228,6 +228,34 @@ export function SettingsClient({
             </button>
           </form>
         </div>
+
+        {user.role === 'admin' && (
+          <div className="card space-y-4">
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-ink/50 mb-3 font-semibold">Admin</div>
+              <h2 className="font-display text-2xl font-bold">Forms</h2>
+              <p className="text-sm text-ink/60 mt-1">Choose which questions each form asks.</p>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Link href="/admin" className="flex items-center gap-3 rounded-xl border border-ink/10 p-4 hover:bg-ink/5">
+                <ClipboardList size={18} className="text-ink/60" />
+                <span className="flex-1">
+                  <span className="block font-semibold">Partner form</span>
+                  <span className="block text-sm text-ink/60">What staff fill in for each partner</span>
+                </span>
+                <ChevronRight size={16} className="text-ink/40" />
+              </Link>
+              <Link href="/admin/intake" className="flex items-center gap-3 rounded-xl border border-ink/10 p-4 hover:bg-ink/5">
+                <FileEdit size={18} className="text-ink/60" />
+                <span className="flex-1">
+                  <span className="block font-semibold">Public intake form</span>
+                  <span className="block text-sm text-ink/60">What organizations fill in to reach you</span>
+                </span>
+                <ChevronRight size={16} className="text-ink/40" />
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

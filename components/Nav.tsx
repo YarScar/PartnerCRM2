@@ -10,7 +10,8 @@ const links = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/partners', label: 'Partners', icon: Users },
   { href: '/intake', label: 'Intake Form', icon: FileEdit },
-  { href: '/admin', label: 'Form', icon: Settings },
+  // Account settings for everyone; admins also reach the form builders (/admin) from there.
+  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export function Nav({ user }: { user: AuthUser | null }) {
@@ -42,10 +43,11 @@ export function Nav({ user }: { user: AuthUser | null }) {
         {user ? (
           <div className="flex items-center gap-3">
             <nav className="hidden md:flex items-center gap-1">
-              {links
-                .filter(({ href }) => user.role === 'admin' || href !== '/admin')
-                .map(({ href, label, icon: Icon }) => {
-                const active = pathname === href || pathname.startsWith(href + '/');
+              {links.map(({ href, label, icon: Icon }) => {
+                const active =
+                  pathname === href ||
+                  pathname.startsWith(href + '/') ||
+                  (href === '/settings' && pathname.startsWith('/admin'));
                 return (
                   <Link
                     key={href}
@@ -66,9 +68,6 @@ export function Nav({ user }: { user: AuthUser | null }) {
               <span>{user.displayName}</span>
               <span className="text-ink/40 uppercase tracking-widest text-[10px]">{user.role}</span>
             </div>
-            <Link href="/settings" className="btn-ghost hidden md:inline-flex" title="Account settings">
-              <UserRound size={14} />
-            </Link>
             <button onClick={logout} className="btn-ghost hidden md:inline-flex">
               <LogOut size={14} />
               Logout
