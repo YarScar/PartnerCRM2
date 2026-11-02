@@ -2,7 +2,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSessionToken, getSessionFromToken } from '../lib/auth';
+import { allowedBeforePasswordChange, createSessionToken, getSessionFromToken } from '../lib/auth';
 import { parseId } from '../lib/parseId';
 
 describe('session tokens', () => {
@@ -10,7 +10,12 @@ describe('session tokens', () => {
 
   it('round-trips a user, including non-ASCII names', async () => {
     const token = await createSessionToken(user);
-    assert.deepEqual(await getSessionFromToken(token), { ...user, email: undefined });
+    assert.deepEqual(await getSessionFromToken(token), { ...user, email: undefined, mustChangePassword: false });
+  });
+
+  it('carries the temporary-password flag', async () => {
+    const token = await createSessionToken({ ...user, mustChangePassword: true });
+    assert.equal((await getSessionFromToken(token))?.mustChangePassword, true);
   });
 
   it('rejects tampered, garbage and missing tokens', async () => {
@@ -22,6 +27,17 @@ describe('session tokens', () => {
     assert.equal(await getSessionFromToken(`${payload}.not*base64`), null);
     assert.equal(await getSessionFromToken('garbage'), null);
     assert.equal(await getSessionFromToken(undefined), null);
+  });
+});
+
+describe('allowedBeforePasswordChange', () => {
+  it('only lets a temporary-password user reach Settings and sign out', () => {
+    assert.equal(allowedBeforePasswordChange('/settings'), true);
+    assert.equal(allowedBeforePasswordChange('/api/account/change-password'), true);
+    assert.equal(allowedBeforePasswordChange('/api/auth/logout'), true);
+    assert.equal(allowedBeforePasswordChange('/dashboard'), false);
+    assert.equal(allowedBeforePasswordChange('/api/partners'), false);
+    assert.equal(allowedBeforePasswordChange('/admin'), false);
   });
 });
 

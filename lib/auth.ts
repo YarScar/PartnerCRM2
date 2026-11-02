@@ -8,6 +8,16 @@ export interface AuthUser {
   displayName: string;
   role: UserRole;
   email?: string;
+  // Set for accounts created with a temporary password (scripts/create-users.ts):
+  // middleware sends them to Settings until they choose their own.
+  mustChangePassword?: boolean;
+}
+
+// Where someone who still has to replace their temporary password may go.
+const ALLOWED_BEFORE_PASSWORD_CHANGE = ['/settings', '/api/account/change-password', '/api/auth/logout', '/api/auth/me', '/login'];
+
+export function allowedBeforePasswordChange(pathname: string) {
+  return ALLOWED_BEFORE_PASSWORD_CHANGE.includes(pathname);
 }
 
 export interface SessionPayload extends AuthUser {
@@ -100,15 +110,18 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
  * still accepted and upgraded on the next successful login).
  */
 export async function authenticate(username: string, password: string): Promise<AuthUser | null> {
-  // Look up the account first, then compare the password.
-  const account = await prisma.user.findUnique({
-    where: { username: username.trim() },
+  // Look up the account first, then compare the password. Usernames are matched
+  // case-insensitively so people whose username is their email can type it any way.
+  const account = await prisma.user.findFirst({
+    where: { username: { equals: username.trim(), mode: 'insensitive' } },
     select: {
       id: true,
       username: true,
       password_hash: true,
       display_name: true,
       role: true,
+      email: true,
+      must_change_password: true,
     },
   });
 
@@ -119,18 +132,21 @@ export async function authenticate(username: string, password: string): Promise<
 
   // Upgrade an old unsalted SHA-256 hash to bcrypt now that we have the plain password.
   if (!account.password_hash.startsWith('$2')) {
-    await changePassword(account.username, password);
+    await prisma.user.update({ where: { id: account.id }, data: { password_hash: await hashPassword(password) } });
   }
 
   return {
     username: account.username,
     displayName: account.display_name,
     role: account.role as UserRole,
+    email: account.email ?? undefined,
+    mustChangePassword: account.must_change_password,
   };
 }
 
 /**
- * Change password for authenticated user using database.
+ * Set a user's own new password. Also clears the "must change password" flag set
+ * for accounts created with a temporary password.
  */
 export async function changePassword(username: string, newPassword: string): Promise<boolean> {
   // Re-hash the new password before storing it.
@@ -139,7 +155,7 @@ export async function changePassword(username: string, newPassword: string): Pro
   try {
     await prisma.user.update({
       where: { username },
-      data: { password_hash: passwordHash },
+      data: { password_hash: passwordHash, must_change_password: false },
     });
     return true;
   } catch {
@@ -175,7 +191,8 @@ export async function getSessionFromToken(token?: string | null): Promise<AuthUs
       username: payload.username,
       displayName: payload.displayName,
       role: payload.role,
-      email: (payload as any).email,
+      email: payload.email,
+      mustChangePassword: payload.mustChangePassword === true,
     };
   } catch {
     return null;

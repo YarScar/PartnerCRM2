@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   authenticate,
   changePassword,
+  createSessionToken,
   getSessionFromToken,
   MIN_PASSWORD_LENGTH,
   SESSION_COOKIE_NAME,
@@ -39,13 +40,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Current password is incorrect' }, { status: 400 });
     }
 
+    if (newPassword === currentPassword) {
+      return NextResponse.json({ error: 'Choose a password different from your current one' }, { status: 400 });
+    }
+
     const success = await changePassword(user.username, newPassword);
     if (!success) {
       return NextResponse.json({ error: 'Failed to change password' }, { status: 500 });
     }
 
     await logAuditEvent('change_password.completed', { username: user.username });
-    return NextResponse.json({ ok: true });
+    const response = NextResponse.json({ ok: true });
+    // Re-issue the cookie without the temporary-password flag so the rest of the app opens up.
+    if (user.mustChangePassword) {
+      response.cookies.set({
+        name: SESSION_COOKIE_NAME,
+        value: await createSessionToken({ ...user, mustChangePassword: false }),
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7,
+      });
+    }
+    return response;
   } catch (err: any) {
     return apiError(err);
   }

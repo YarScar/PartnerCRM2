@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Lock, Loader2, UserRound } from 'lucide-react';
 
 export function SettingsClient({ user }: { user: any }) {
+  const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -41,6 +43,13 @@ export function SettingsClient({ user }: { user: any }) {
       const body = await response.json().catch(() => ({}));
       setError(body.error || 'Failed to change password');
       setSubmitting(false);
+      return;
+    }
+
+    // First login with a temporary password: the app is unlocked now.
+    if (user.mustChangePassword) {
+      router.replace('/dashboard');
+      router.refresh();
       return;
     }
 
@@ -82,6 +91,16 @@ export function SettingsClient({ user }: { user: any }) {
         <div className="text-xs uppercase tracking-widest text-ink/50 mb-2">Account</div>
         <h1 className="font-display text-5xl md:text-6xl font-bold tracking-tight">Settings</h1>
       </div>
+
+      {user.mustChangePassword && (
+        <div className="card border-court/40 bg-court/5 mb-8">
+          <h2 className="font-display text-xl font-bold">Welcome! Set your own password</h2>
+          <p className="text-sm text-ink/70 mt-1">
+            You signed in with a temporary password. Enter it as your current password below and choose a new
+            one to open the rest of the app.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-8">
         {/* Profile Info */}

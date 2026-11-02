@@ -13,3 +13,6 @@ build
 
 .vercel
 .env*
+
+# Account list with temporary passwords (scripts/create-users.ts)
+*.local.json

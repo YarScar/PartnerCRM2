@@ -44,6 +44,14 @@ When `DATABASE_URL` is unset in local development, the app falls back to the in-
 
 `npm run db:migrate` (`prisma migrate dev`) is for creating migrations against a development database only. To apply committed migrations to the production database, run `npm run db:deploy` (`prisma migrate deploy`) with the production `DATABASE_URL`, before deploying code that needs them.
 
+## Creating accounts
+
+1. Copy `users.example.json` to `users.local.json` (gitignored) and fill in each person's email, name, role (`admin` or `staff`) and a temporary password (8+ characters).
+2. Run `npm run users:create`. It uses the `DATABASE_URL` in `.env.local`; to create accounts on the live site, point that at the production database.
+3. Delete `users.local.json`, then send each person their temporary password privately.
+
+They sign in with their email and the temporary password, and must choose their own password before the rest of the app opens. Existing accounts are never changed.
+
 ## Checks
 
 | Command | What it does |
