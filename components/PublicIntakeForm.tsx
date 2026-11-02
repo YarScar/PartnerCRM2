@@ -163,7 +163,8 @@ export function PublicIntakeForm() {
           <div className="text-xs uppercase tracking-widest text-court font-semibold mb-2">{section.label}</div>
           <div className="space-y-4">
             {section.fields
-              .filter((f: any) => f.public === true)
+              // Every field on the intake form shows unless an admin hid it (the eye icon).
+              .filter((f: any) => f.visible !== false)
               .map((field: any) => {
                 const name = field.id;
                 const type: FieldType = field.type;

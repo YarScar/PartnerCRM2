@@ -1,97 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import apiError from '@/lib/apiError';
-import { prisma, hasDb } from '@/lib/db';
+import { prisma } from '@/lib/db';
 import { getSessionFromToken, isAdmin, SESSION_COOKIE_NAME } from '@/lib/auth';
-import DEFAULT_FORM_CONFIG from '@/lib/defaultFormConfig';
+import { loadFormSections } from '@/lib/formConfigLoad';
 import { storedOptions, validateFormSections } from '@/lib/formConfigSave';
 
 function intakePrefix(form: string | null) {
   return form === 'intake' ? 'intake:' : '';
 }
 
+// Public: the intake form page reads it. Saving (POST) is admin-only.
 export async function GET(req: NextRequest) {
-  // If no DATABASE_URL is configured, return the local default config immediately
-  if (!hasDb()) return NextResponse.json(DEFAULT_FORM_CONFIG);
-
   try {
-    const url = new URL(req.url);
-    const form = url.searchParams.get('form');
-    const prefix = intakePrefix(form);
-
-    const all = await prisma.formConfig.findMany({
-      orderBy: [{ sort_order: 'asc' }],
-    });
-
-    // Intake rows start with 'intake:'. Once the intake form has been saved, its own rows are
-    // the whole form, so deleting a field in the intake editor really removes it. Before that,
-    // show the partner-form fields marked public as a starting point.
-    const intakeRows = all.filter((r) => r.section_key.startsWith('intake:'));
-    let rows =
-      form === 'intake'
-        ? intakeRows.length > 0
-          ? intakeRows
-          : all.filter((r) => !r.section_key.startsWith('intake:') && (r.options as any)?.meta?.public === true)
-        : all.filter((r) => !r.section_key.startsWith('intake:'));
-
-    // Deduplicate rows by normalized section + field, preferring explicit intake: rows when present.
-    const deduped = new Map<string, any>();
-    for (const r of rows) {
-      const normalizedSection = r.section_key.replace(/^intake:/, '');
-      const key = `${normalizedSection}:${r.field_key}`;
-      const existing = deduped.get(key);
-      if (!existing) {
-        deduped.set(key, r);
-        continue;
-      }
-      // prefer intake-prefixed row over non-prefixed
-      const existingIsIntake = String(existing.section_key).startsWith('intake:');
-      const thisIsIntake = String(r.section_key).startsWith('intake:');
-      if (thisIsIntake && !existingIsIntake) {
-        // If the non-intake (existing) row explicitly marks public=false, prefer it
-        // so admin changes to not-public override any stale intake-prefixed copies.
-        const existingMeta = existing.options && (existing.options as any).meta ? (existing.options as any).meta : {};
-        if (existingMeta.public === false) {
-          // keep existing non-intake row
-        } else {
-          deduped.set(key, r);
-        }
-      }
-      if (existingIsIntake && !thisIsIntake) {
-        // If the incoming non-intake row explicitly marks public=false, prefer it
-        // to override any intake-prefixed copy.
-        const thisMeta = r.options && (r.options as any).meta ? (r.options as any).meta : {};
-        if (thisMeta.public === false) {
-          deduped.set(key, r);
-        }
-      }
-      // otherwise keep existing
-    }
-    rows = Array.from(deduped.values());
-
-    const sections = new Map<string, any>();
-    rows.forEach((row) => {
-      const sectionKey = prefix ? row.section_key.replace(/^intake:/, '') : row.section_key;
-      if (!sections.has(sectionKey)) {
-        sections.set(sectionKey, {
-          id: sectionKey,
-          label: row.section_label,
-          fields: [],
-        });
-      }
-      const meta = row.options && (row.options as any).meta ? (row.options as any).meta : {};
-      sections.get(sectionKey).fields.push({
-        id: row.field_key,
-        label: row.field_label,
-        type: row.field_type as any,
-        visible: row.visible ?? true,
-        required: row.required ?? false,
-        public: meta.public ?? undefined,
-        options: row.options,
-        sort_order: row.sort_order,
-      });
-    });
-
-    return NextResponse.json(Array.from(sections.values()));
+    const form = new URL(req.url).searchParams.get('form') === 'intake' ? 'intake' : 'partner';
+    return NextResponse.json(await loadFormSections(form));
   } catch (err: any) {
     return apiError(err);
   }
