@@ -1,8 +1,8 @@
 import { Resend } from 'resend';
 
-// Resend's shared test sender only delivers to the Resend account owner's own
-// address, so production must send from a domain verified in Resend (EMAIL_FROM).
-const DEV_FALLBACK_FROM = 'PartnerCRM <onboarding@resend.dev>';
+// Resend's shared test sender. It only delivers to the Resend account owner's own
+// address, so it's for testing until a domain is verified in Resend (EMAIL_FROM).
+const TEST_SENDER = 'PartnerCRM <onboarding@resend.dev>';
 
 export type SendResult = { sent: string[]; failed: { to: string; error: string }[] };
 
@@ -14,10 +14,8 @@ function getResend() {
 function getFrom() {
   const from = process.env.EMAIL_FROM?.trim();
   if (from) return from;
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('EMAIL_FROM is missing (use an address on a domain verified in Resend)');
-  }
-  return DEV_FALLBACK_FROM;
+  console.warn('EMAIL_FROM is not set: sending from Resend test sender, which only reaches the Resend account owner');
+  return TEST_SENDER;
 }
 
 export function escapeHtml(value: unknown) {

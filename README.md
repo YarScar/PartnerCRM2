@@ -123,7 +123,7 @@ comma-separated `NOTIFICATION_EMAILS`. Admin *usernames* are never used as addre
 - `RESEND_API_KEY` — from the Resend account that owns the sending domain.
 - `EMAIL_FROM` — e.g. `CreateAccess <notifications@yourdomain.org>`, on a domain verified in
   Resend (SPF/DKIM DNS records added). Resend's test sender `onboarding@resend.dev` only
-  delivers to the Resend account owner, so production refuses to send without `EMAIL_FROM`.
+  delivers to the Resend account owner, so until `EMAIL_FROM` is set, emails only reach that one address.
 - `NOTIFICATION_EMAILS` — a shared inbox, so notifications survive staff changes.
 - `CRON_SECRET` — any long random string; Vercel sends it to the cron route automatically.
   Without it the scheduled digest returns 401.
