@@ -2,11 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { ArrowLeft, Lock, Loader2, UserRound } from 'lucide-react';
 
 export function SettingsClient({ user }: { user: any }) {
-  const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -46,10 +44,11 @@ export function SettingsClient({ user }: { user: any }) {
       return;
     }
 
-    // First login with a temporary password: the app is unlocked now.
+    // First login with a temporary password: the app is unlocked now. Use a full page
+    // load: the client router has cached "/dashboard → /settings" from before, and
+    // would keep showing this page.
     if (user.mustChangePassword) {
-      router.replace('/dashboard');
-      router.refresh();
+      window.location.assign('/dashboard');
       return;
     }
 
