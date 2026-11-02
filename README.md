@@ -82,12 +82,39 @@ prisma/
 - **Admin permissions:** admin accounts can open the form configurator and delete partners; staff can manage partners and notes.
 - **Admin form configurator:** add/remove sections and fields, rename labels, toggle visibility, mark required (changes persist to localStorage in this prototype — wire to the `form_config` table for production).
 
+## Email notifications
+
+Two emails go out through [Resend](https://resend.com):
+
+| Email | When | Code |
+|---|---|---|
+| New intake | Right after someone submits the public intake form | `app/api/intake/route.ts` → `lib/notifications.ts` `notifyNewIntake` |
+| Weekly digest | Mondays 09:00 UTC (Vercel Cron, `vercel.json`), or **Email Admins** on `/admin/digest` | `app/api/digest/send/route.ts` → `sendWeeklyDigest` |
+
+**Recipients:** every admin whose email is verified (Settings → verify email) plus the
+comma-separated `NOTIFICATION_EMAILS`. Admin *usernames* are never used as addresses.
+
+**Required settings (Vercel → Project → Settings → Environment Variables):**
+
+- `RESEND_API_KEY` — from the Resend account that owns the sending domain.
+- `EMAIL_FROM` — e.g. `CreateAccess <notifications@yourdomain.org>`, on a domain verified in
+  Resend (SPF/DKIM DNS records added). Resend's test sender `onboarding@resend.dev` only
+  delivers to the Resend account owner, so production refuses to send without `EMAIL_FROM`.
+- `NOTIFICATION_EMAILS` — a shared inbox, so notifications survive staff changes.
+- `CRON_SECRET` — any long random string; Vercel sends it to the cron route automatically.
+  Without it the scheduled digest returns 401.
+- `OPENAI_API_KEY` — the digest text is generated from counts only (no partner names).
+
+**Checking it works:** `GET /api/health` shows which of these are set (true/false only).
+`npm run test:email -- you@example.org` sends one test email with the current settings.
+Failed sends are logged as `email send failed` in Vercel → Logs, and the Email Admins button
+reports who it reached and who it didn't. `npm test` runs the unit tests.
+
 ## Next steps
 
 - Wire admin configurator changes to the `form_config` table (schema is already there).
 - Upgrade authentication hardening for production (the current app already uses a lightweight custom login/session flow).
 - Add file uploads for partner documents (Neon doesn't store files; pair with S3 or Vercel Blob).
-- Email notifications when intake forms come in.
 - Export to CSV.
 
 ## Form configuration & public intake (current)

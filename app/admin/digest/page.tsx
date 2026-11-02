@@ -16,6 +16,7 @@ export default function AdminDigestPage() {
     try {
       const res = await fetch('/api/digest');
       const body = await res.json();
+      if (!res.ok) throw new Error(body.error || 'Failed to generate digest');
       setMarkdown(body.markdown || '');
       setData(body.data || null);
     } catch (err: any) {
@@ -34,7 +35,12 @@ export default function AdminDigestPage() {
       const res = await fetch('/api/digest/send', { method: 'POST' });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || 'Failed to send');
-      setToast({ type: 'success', msg: 'Digest sent!' });
+      const failed: { to: string }[] = body.failed || [];
+      setToast(
+        failed.length > 0
+          ? { type: 'error', msg: `Sent to ${body.sentTo.join(', ')}. Failed for ${failed.map((f) => f.to).join(', ')}.` }
+          : { type: 'success', msg: `Digest sent to ${body.sentTo.join(', ')}.` }
+      );
     } catch (err: any) {
       setToast({ type: 'error', msg: err?.message || 'Send failed' });
     }
