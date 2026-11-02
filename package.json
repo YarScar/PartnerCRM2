@@ -19,9 +19,9 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "test:email": "node ./scripts/test-email.js",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma migrate deploy",
-    "db:seed": "tsx db/seed.ts",
+    "db:migrate": "dotenv -e .env.local -e .env -- prisma migrate dev",
+    "db:deploy": "dotenv -e .env.local -e .env -- prisma migrate deploy",
+    "db:seed": "dotenv -e .env.local -e .env -- tsx db/seed.ts",
     "users:create": "tsx scripts/create-users.ts"
   },
   "dependencies": {
@@ -40,6 +40,7 @@
     "@types/react-dom": "^19.0.0",
     "autoprefixer": "^10.4.20",
     "dotenv": "^16.4.5",
+    "dotenv-cli": "^11.1.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.2.6",
     "postcss": "^8.5.14",
