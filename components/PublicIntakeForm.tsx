@@ -74,6 +74,9 @@ export function PublicIntakeForm() {
       }
     }
 
+    // Real people never see this field; the server drops submissions that fill it.
+    body.company_website = String(formData.get('company_website') ?? '');
+
     try {
       const response = await fetch('/api/intake', {
         method: 'POST',
@@ -144,6 +147,7 @@ export function PublicIntakeForm() {
 
         {error && <p className="text-sm text-red-700">{error}</p>}
 
+        <SpamTrap />
         <button type="submit" className="btn-primary w-full justify-center" disabled={saving}>
           {saving ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
           {saving ? 'Submitting...' : 'Send intake'}
@@ -229,10 +233,24 @@ export function PublicIntakeForm() {
 
       {error && <p className="text-sm text-red-700">{error}</p>}
 
+      <SpamTrap />
       <button type="submit" className="btn-primary w-full justify-center" disabled={saving}>
         {saving ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
         {saving ? 'Submitting...' : 'Send intake'}
       </button>
     </form>
+  );
+}
+
+// Hidden "honeypot" field: off-screen for people and screen readers, but spam bots
+// fill in every input. Checked by app/api/intake/route.ts.
+function SpamTrap() {
+  return (
+    <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+      <label>
+        Leave this empty
+        <input type="text" name="company_website" tabIndex={-1} autoComplete="off" />
+      </label>
+    </div>
   );
 }

@@ -1,3 +1,4 @@
+// Imported by middleware.ts (Edge runtime): keep Node-only modules out of this file.
 import { prisma } from './db';
 
 export type UserRole = 'admin' | 'staff';
@@ -16,9 +17,21 @@ export interface SessionPayload extends AuthUser {
 export const SESSION_COOKIE_NAME = 'createaccess_session';
 // Keep sessions alive for a week so staff do not have to log in constantly.
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
-// Use a real secret in production. The dev fallback keeps local work simple.
-const AUTH_SECRET = process.env.AUTH_SECRET || process.env.NEXT_PUBLIC_AUTH_SECRET || 'createaccess-dev-secret';
 const SALT_ROUNDS = 12;
+export const MIN_PASSWORD_LENGTH = 8;
+const DEV_AUTH_SECRET = 'createaccess-dev-secret';
+
+// Anyone who knows the signing secret can forge an admin session, so production
+// refuses to run on the public dev fallback (or a short secret). Read per call,
+// not at import, so `next build` works without the secret.
+export function getAuthSecret(env: Record<string, string | undefined> = process.env): string {
+  const secret = env.AUTH_SECRET?.trim();
+  if (secret && secret.length >= 32) return secret;
+  if (env.NODE_ENV === 'production') {
+    throw new Error('AUTH_SECRET must be set to a random string of at least 32 characters');
+  }
+  return secret || DEV_AUTH_SECRET;
+}
 
 function toBase64Url(value: string) {
   return btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
@@ -33,7 +46,7 @@ function fromBase64Url(value: string) {
 async function importKey() {
   return crypto.subtle.importKey(
     'raw',
-    new TextEncoder().encode(AUTH_SECRET),
+    new TextEncoder().encode(getAuthSecret()),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign', 'verify']

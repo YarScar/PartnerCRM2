@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import apiError from '@/lib/apiError';
 import { prisma, hasDb } from '@/lib/db';
+import { getSessionFromToken, isAdmin, SESSION_COOKIE_NAME } from '@/lib/auth';
 import DEFAULT_FORM_CONFIG from '@/lib/defaultFormConfig';
 
 function intakePrefix(form: string | null) {
@@ -102,137 +103,144 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // GET stays public (the public intake form reads it); saving is admin-only.
+  const user = await getSessionFromToken(req.cookies.get(SESSION_COOKIE_NAME)?.value);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!isAdmin(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   try {
     const url = new URL(req.url);
     const form = url.searchParams.get('form');
     const prefix = intakePrefix(form);
 
     const sections = await req.json();
-
-    // Delete existing config for this form only
-    if (form === 'intake') {
-      await prisma.formConfig.deleteMany({ where: { section_key: { startsWith: 'intake:' } } });
-    } else {
-      await prisma.formConfig.deleteMany({ where: { section_key: { not: { startsWith: 'intake:' } } } });
+    if (!Array.isArray(sections) || sections.some((s: any) => !s?.id || !Array.isArray(s.fields))) {
+      return NextResponse.json({ error: 'Expected an array of sections with fields' }, { status: 400 });
     }
 
-    // Insert new config (prefix section keys for intake when needed)
-    let sortOrder = 0;
-    for (const section of sections) {
-      const sectionKey = `${prefix}${section.id}`;
-      for (const field of section.fields) {
-        // Support storing metadata inside options as { items?: [...], meta?: {...} }
-        let optionsToStore: any = null;
-        const hasOptionsArray = Array.isArray(field.options) && field.options.length > 0;
-        const incomingMeta = (field as any).meta ? { ...(field as any).meta } : {};
-        if (typeof (field as any).public !== 'undefined') incomingMeta.public = (field as any).public;
-        const hasMeta = incomingMeta && Object.keys(incomingMeta).length > 0;
-        if (hasOptionsArray && hasMeta) optionsToStore = { items: field.options, meta: incomingMeta };
-        else if (hasMeta) optionsToStore = { meta: incomingMeta };
-        else if (hasOptionsArray) optionsToStore = field.options;
+    // One transaction: a failure part-way leaves the previous config in place
+    // instead of a half-deleted form.
+    await prisma.$transaction(async (tx) => {
+      // Delete existing config for this form only
+      if (form === 'intake') {
+        await tx.formConfig.deleteMany({ where: { section_key: { startsWith: 'intake:' } } });
+      } else {
+        await tx.formConfig.deleteMany({ where: { section_key: { not: { startsWith: 'intake:' } } } });
+      }
 
-        await prisma.formConfig.create({
-          data: {
-            section_key: sectionKey,
-            section_label: section.label,
-            field_key: field.id,
-            field_label: field.label,
-            field_type: field.type,
-            options: optionsToStore,
-            visible: field.visible,
-            required: field.required,
-            sort_order: field.sort_order ?? sortOrder,
-          },
-        });
+      // Insert new config (prefix section keys for intake when needed)
+      let sortOrder = 0;
+      for (const section of sections) {
+        const sectionKey = `${prefix}${section.id}`;
+        for (const field of section.fields) {
+          // Support storing metadata inside options as { items?: [...], meta?: {...} }
+          let optionsToStore: any = null;
+          const hasOptionsArray = Array.isArray(field.options) && field.options.length > 0;
+          const incomingMeta = (field as any).meta ? { ...(field as any).meta } : {};
+          if (typeof (field as any).public !== 'undefined') incomingMeta.public = (field as any).public;
+          const hasMeta = incomingMeta && Object.keys(incomingMeta).length > 0;
+          if (hasOptionsArray && hasMeta) optionsToStore = { items: field.options, meta: incomingMeta };
+          else if (hasMeta) optionsToStore = { meta: incomingMeta };
+          else if (hasOptionsArray) optionsToStore = field.options;
 
-        // If this field is marked public on the internal form, ensure an intake-prefixed
-        // copy exists so it appears on the public intake. Use upsert to avoid duplicates.
-        try {
-          const intakeSectionKey = `intake:${section.id}`;
-          if ((field as any).public) {
-            // ensure meta.public is true for the intake copy
-            const intakeMeta = (field as any).meta ? { ...(field as any).meta } : {};
-            intakeMeta.public = true;
-            let intakeOptions: any = null;
-            const hasOptionsArray2 = Array.isArray(field.options) && field.options.length > 0;
-            const hasMeta2 = intakeMeta && Object.keys(intakeMeta).length > 0;
-            if (hasOptionsArray2 && hasMeta2) intakeOptions = { items: field.options, meta: intakeMeta };
-            else if (hasMeta2) intakeOptions = { meta: intakeMeta };
-            else if (hasOptionsArray2) intakeOptions = field.options;
+          await tx.formConfig.create({
+            data: {
+              section_key: sectionKey,
+              section_label: section.label,
+              field_key: field.id,
+              field_label: field.label,
+              field_type: field.type,
+              options: optionsToStore,
+              visible: field.visible,
+              required: field.required,
+              sort_order: field.sort_order ?? sortOrder,
+            },
+          });
 
-            await prisma.formConfig.upsert({
-              where: {
-                section_key_field_key: {
+          // If this field is marked public on the internal form, ensure an intake-prefixed
+          // copy exists so it appears on the public intake. Use upsert to avoid duplicates.
+          {
+            const intakeSectionKey = `intake:${section.id}`;
+            if ((field as any).public) {
+              // ensure meta.public is true for the intake copy
+              const intakeMeta = (field as any).meta ? { ...(field as any).meta } : {};
+              intakeMeta.public = true;
+              let intakeOptions: any = null;
+              const hasOptionsArray2 = Array.isArray(field.options) && field.options.length > 0;
+              const hasMeta2 = intakeMeta && Object.keys(intakeMeta).length > 0;
+              if (hasOptionsArray2 && hasMeta2) intakeOptions = { items: field.options, meta: intakeMeta };
+              else if (hasMeta2) intakeOptions = { meta: intakeMeta };
+              else if (hasOptionsArray2) intakeOptions = field.options;
+
+              await tx.formConfig.upsert({
+                where: {
+                  section_key_field_key: {
+                    section_key: intakeSectionKey,
+                    field_key: field.id,
+                  },
+                },
+                update: {
+                  section_label: section.label,
+                  field_label: field.label,
+                  field_type: field.type,
+                  options: intakeOptions,
+                  visible: field.visible,
+                  required: field.required,
+                  sort_order: field.sort_order ?? sortOrder,
+                },
+                create: {
+                  section_key: intakeSectionKey,
+                  section_label: section.label,
+                  field_key: field.id,
+                  field_label: field.label,
+                  field_type: field.type,
+                  options: intakeOptions,
+                  visible: field.visible,
+                  required: field.required,
+                  sort_order: field.sort_order ?? sortOrder,
+                },
+              });
+            } else if (typeof (field as any).public !== 'undefined' && (field as any).public === false) {
+              // If the field is explicitly set to not public, remove any intake-prefixed copy
+              await tx.formConfig.deleteMany({
+                where: {
                   section_key: intakeSectionKey,
                   field_key: field.id,
                 },
-              },
-              update: {
-                section_label: section.label,
-                field_label: field.label,
-                field_type: field.type,
-                options: intakeOptions,
-                visible: field.visible,
-                required: field.required,
-                sort_order: field.sort_order ?? sortOrder,
-              },
-              create: {
-                section_key: intakeSectionKey,
-                section_label: section.label,
-                field_key: field.id,
-                field_label: field.label,
-                field_type: field.type,
-                options: intakeOptions,
-                visible: field.visible,
-                required: field.required,
-                sort_order: field.sort_order ?? sortOrder,
-              },
-            });
-          } else if (typeof (field as any).public !== 'undefined' && (field as any).public === false) {
-            // If the field is explicitly set to not public, remove any intake-prefixed copy
-            await prisma.formConfig.deleteMany({
-              where: {
-                section_key: intakeSectionKey,
-                field_key: field.id,
-              },
-            });
+              });
+            }
           }
-        } catch (e) {
-          // Non-fatal: log and continue so admin save doesn't fail if intake upsert/delete errors
-          console.error('Failed to upsert/delete intake copy for field', field.id, e);
-        }
-        sortOrder += 1;
-      }
-    }
-
-    // Cleanup: remove any intake-prefixed rows whose non-prefixed counterpart
-    // is not explicitly public. This prevents stale intake copies from remaining
-    // after an admin saves fields as not public.
-    try {
-      const nonIntakeRows = await prisma.formConfig.findMany({
-        where: { section_key: { not: { startsWith: 'intake:' } } },
-      });
-      const nonIntakeMap = new Map<string, any>();
-      nonIntakeRows.forEach((r) => {
-        const key = `${r.section_key}:${r.field_key}`;
-        const meta = r.options && (r.options as any).meta ? (r.options as any).meta : {};
-        nonIntakeMap.set(key, meta.public === true);
-      });
-
-      const intakeRows = await prisma.formConfig.findMany({
-        where: { section_key: { startsWith: 'intake:' } },
-      });
-      for (const r of intakeRows) {
-        const normalizedSection = r.section_key.replace(/^intake:/, '');
-        const key = `${normalizedSection}:${r.field_key}`;
-        const shouldBePublic = nonIntakeMap.get(key) === true;
-        if (!shouldBePublic) {
-          await prisma.formConfig.deleteMany({ where: { section_key: r.section_key, field_key: r.field_key } });
+          sortOrder += 1;
         }
       }
-    } catch (e) {
-      console.error('Failed to cleanup intake-prefixed rows', e);
-    }
+
+      // Cleanup: remove any intake-prefixed rows whose non-prefixed counterpart
+      // is not explicitly public. This prevents stale intake copies from remaining
+      // after an admin saves fields as not public.
+      {
+        const nonIntakeRows = await tx.formConfig.findMany({
+          where: { section_key: { not: { startsWith: 'intake:' } } },
+        });
+        const nonIntakeMap = new Map<string, any>();
+        nonIntakeRows.forEach((r) => {
+          const key = `${r.section_key}:${r.field_key}`;
+          const meta = r.options && (r.options as any).meta ? (r.options as any).meta : {};
+          nonIntakeMap.set(key, meta.public === true);
+        });
+
+        const intakeRows = await tx.formConfig.findMany({
+          where: { section_key: { startsWith: 'intake:' } },
+        });
+        for (const r of intakeRows) {
+          const normalizedSection = r.section_key.replace(/^intake:/, '');
+          const key = `${normalizedSection}:${r.field_key}`;
+          const shouldBePublic = nonIntakeMap.get(key) === true;
+          if (!shouldBePublic) {
+            await tx.formConfig.deleteMany({ where: { section_key: r.section_key, field_key: r.field_key } });
+          }
+        }
+      }
+    }, { timeout: 30000 });
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

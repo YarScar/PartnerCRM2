@@ -96,6 +96,9 @@ comma-separated `NOTIFICATION_EMAILS`. Admin *usernames* are never used as addre
 
 **Required settings (Vercel → Project → Settings → Environment Variables):**
 
+- `DATABASE_URL` — production refuses to run without it (no silent mock-data fallback).
+- `AUTH_SECRET` — at least 32 random characters (`openssl rand -hex 32`); signs login
+  cookies. Production refuses to run without it. Changing it signs everyone out.
 - `RESEND_API_KEY` — from the Resend account that owns the sending domain.
 - `EMAIL_FROM` — e.g. `CreateAccess <notifications@yourdomain.org>`, on a domain verified in
   Resend (SPF/DKIM DNS records added). Resend's test sender `onboarding@resend.dev` only

@@ -24,8 +24,8 @@ export function SettingsClient({ user }: { user: any }) {
       return;
     }
 
-    if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters');
       return;
     }
 
@@ -164,7 +164,7 @@ export function SettingsClient({ user }: { user: any }) {
                 placeholder="••••••••"
                 required
               />
-              <p className="text-xs text-ink/50 mt-1">Must be at least 6 characters</p>
+              <p className="text-xs text-ink/50 mt-1">Must be at least 8 characters</p>
             </label>
 
             <label className="block">
