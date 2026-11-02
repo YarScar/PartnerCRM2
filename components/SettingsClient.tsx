@@ -2,9 +2,17 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Lock, Loader2, UserRound } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, Lock, Loader2, UserRound } from 'lucide-react';
 
-export function SettingsClient({ user }: { user: any }) {
+export function SettingsClient({
+  user,
+  emailVerified,
+  verifyResult,
+}: {
+  user: any;
+  emailVerified: boolean;
+  verifyResult?: 'success' | 'error';
+}) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -135,8 +143,20 @@ export function SettingsClient({ user }: { user: any }) {
                   className="input-base"
                   placeholder="you@example.com"
                 />
-                <button className="btn-primary" type="submit">Send verification</button>
+                {/* Only offer verification for an email that isn't already the verified one. */}
+                {emailVerified && email.trim().toLowerCase() === (user.email || '').toLowerCase() ? (
+                  <span className="inline-flex items-center gap-1 text-sm font-semibold text-green-700 whitespace-nowrap">
+                    <BadgeCheck size={16} />
+                    Verified
+                  </span>
+                ) : (
+                  <button className="btn-primary" type="submit">Send verification</button>
+                )}
               </form>
+              {verifyResult === 'success' && <div className="text-sm text-green-700">Email verified.</div>}
+              {verifyResult === 'error' && (
+                <div className="text-sm text-red-700">That verification link is invalid or expired. Send a new one.</div>
+              )}
               {emailStatus && <div className="text-sm text-ink/60">{emailStatus}</div>}
             </div>
 
