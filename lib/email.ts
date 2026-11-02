@@ -50,7 +50,7 @@ async function sendToEach(to: string[], subject: string, html: string, text: str
   return result;
 }
 
-function wrapHtml(bodyHtml: string, title = 'CreateAccess Weekly Digest', preheader = '') {
+function wrapHtml(bodyHtml: string, title = 'CreateAccess', preheader = '') {
   // A responsive, branded email template that matches the webapp styles.
   return `
     <!doctype html>
@@ -192,13 +192,6 @@ export async function sendIntakeNotification(adminEmails: string[], partner: {
   const text = [...rows.map(([k, v]) => `${k}: ${v}`), '', `View: ${viewUrl}`].join('\n');
 
   return sendToEach(adminEmails, subject, html, text);
-}
-
-// `text` should be the plain-text source (e.g. the digest's markdown); stripping
-// tags from the HTML is only a fallback.
-export async function sendHtmlEmail(to: string[], subject: string, htmlContent: string, text?: string): Promise<SendResult> {
-  const html = wrapHtml(htmlContent, escapeHtml(subject), escapeHtml(subject));
-  return sendToEach(to, subject, html, text ?? htmlContent.replace(/<[^>]+>/g, ''));
 }
 
 export async function sendEmailVerification(to: string, verifyUrl: string): Promise<void> {

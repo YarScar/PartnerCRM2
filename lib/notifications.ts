@@ -1,7 +1,6 @@
 import type { Partner } from './types';
 import { prisma, hasDb } from './db';
-import { sendHtmlEmail, sendIntakeNotification, type SendResult } from './email';
-import { getDigestData, renderDigest } from './digest';
+import { sendIntakeNotification, type SendResult } from './email';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -58,13 +57,4 @@ export async function notifyNewIntake(partner: Partner): Promise<NotifyResult> {
     console.error('intake notification: some recipients failed', { partnerId: partner.id, failed: result.failed });
   }
   return result;
-}
-
-export async function sendWeeklyDigest(): Promise<NotifyResult> {
-  const recipients = await getAdminRecipients();
-  if (recipients.length === 0) return { sent: [], failed: [], skipped: 'no recipients' };
-
-  const { html, text } = renderDigest(await getDigestData());
-  const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  return sendHtmlEmail(recipients, `CreateAccess Weekly Digest — ${dateStr}`, html, text);
 }

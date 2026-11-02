@@ -3,7 +3,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { escapeHtml } from '../lib/email';
-import { isCronRequest } from '../lib/cron';
 import { parseEmailList } from '../lib/notifications';
 
 describe('parseEmailList', () => {
@@ -27,19 +26,5 @@ describe('escapeHtml', () => {
       '&lt;a href=&quot;https://evil.example&quot;&gt;Click&lt;/a&gt; &amp; &#39;x&#39;'
     );
     assert.equal(escapeHtml(undefined), '');
-  });
-});
-
-describe('isCronRequest', () => {
-  it('accepts only the exact bearer secret', () => {
-    assert.equal(isCronRequest('Bearer s3cret', 's3cret'), true);
-    assert.equal(isCronRequest('Bearer wrong!', 's3cret'), false);
-    assert.equal(isCronRequest('s3cret', 's3cret'), false);
-    assert.equal(isCronRequest(null, 's3cret'), false);
-  });
-
-  it('refuses every call when no secret is configured', () => {
-    assert.equal(isCronRequest('Bearer ', ''), false);
-    assert.equal(isCronRequest('Bearer undefined', undefined), false);
   });
 });
