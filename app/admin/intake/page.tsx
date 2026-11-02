@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import normalizeOptions from '@/lib/formConfigUtils';
 import { Plus, Trash2, Eye, EyeOff, GripVertical, Save } from 'lucide-react';
 import { FIELD_LIBRARY } from '@/lib/fieldLibrary';
@@ -282,9 +283,9 @@ export default function AdminIntakePage() {
     <div className="max-w-5xl mx-auto px-6 py-10">
       <div className="flex items-end justify-between flex-wrap gap-4 mb-2">
         <div>
-          <div className="text-xs uppercase tracking-widest text-ink/50 mb-2">
-            Configuration
-          </div>
+          <Link href="/settings" className="inline-block text-xs uppercase tracking-widest text-ink/50 hover:text-ink mb-2">
+            ← Settings
+          </Link>
           <h1 className="font-display text-5xl md:text-6xl font-bold tracking-tight">
             Intake Form
           </h1>
