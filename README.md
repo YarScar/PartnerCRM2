@@ -105,12 +105,11 @@ tests/                     — unit tests (`npm test`)
 
 ## Email notifications
 
-Two emails go out through [Resend](https://resend.com):
+Emails go out through [Resend](https://resend.com):
 
 | Email | When | Code |
 |---|---|---|
 | New intake | Right after someone submits the public intake form | `app/api/intake/route.ts` → `lib/notifications.ts` `notifyNewIntake` |
-| Weekly digest | Mondays 09:00 UTC (Vercel Cron, `vercel.json`), or **Email Admins** on `/admin/digest` | `app/api/digest/send/route.ts` → `sendWeeklyDigest` |
 
 **Recipients:** every admin whose email is verified (Settings → verify email) plus the
 comma-separated `NOTIFICATION_EMAILS`. Admin *usernames* are never used as addresses.
@@ -125,12 +124,8 @@ comma-separated `NOTIFICATION_EMAILS`. Admin *usernames* are never used as addre
   Resend (SPF/DKIM DNS records added). Resend's test sender `onboarding@resend.dev` only
   delivers to the Resend account owner, so until `EMAIL_FROM` is set, emails only reach that one address.
 - `NOTIFICATION_EMAILS` — a shared inbox, so notifications survive staff changes.
-- `CRON_SECRET` — any long random string; Vercel sends it to the cron route automatically.
-  Without it the scheduled digest returns 401.
 
-The digest is built straight from the database (`lib/digest.ts` `renderDigest`): new
-inquiries, recently updated partners, timelines in the next 30 days, and active partners
-with no note in 14 days. The app uses no AI services.
+The app uses no AI services.
 
 **Checking it works:** `GET /api/health` shows which of these are set (true/false only).
 `npm run test:email -- you@example.org` sends one test email with the current settings.
