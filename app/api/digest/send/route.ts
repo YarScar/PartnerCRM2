@@ -1,92 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { getSessionFromToken, isAdmin, SESSION_COOKIE_NAME } from '@/lib/auth';
-import { getDigestData, sanitizeDigestForAI } from '@/lib/digest';
-import { marked } from 'marked';
-import { prisma } from '@/lib/db';
-import { sendHtmlEmail } from '@/lib/email';
+import { isCronRequest } from '@/lib/cron';
+import { sendWeeklyDigest } from '@/lib/notifications';
 
-export async function POST(req: NextRequest) {
+// One email per admin, sent one after another.
+export const maxDuration = 60;
+
+async function send() {
   try {
-    const cookie = req.cookies.get(SESSION_COOKIE_NAME)?.value;
-    const user = await getSessionFromToken(cookie);
-    if (!user || !isAdmin(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-
-    const data = await getDigestData();
-    // Turn the digest into a safer summary before sending it to the AI.
-    const aiData = sanitizeDigestForAI(data);
-
-    if (!process.env.OPENAI_API_KEY) {
-      console.error('OPENAI_API_KEY missing in environment');
-      return NextResponse.json({ error: 'OPENAI_API_KEY missing' }, { status: 500 });
+    const result = await sendWeeklyDigest();
+    if (result.skipped) {
+      return NextResponse.json(
+        { error: 'No admin email addresses: verify an admin email in Settings or set NOTIFICATION_EMAILS' },
+        { status: 400 }
+      );
     }
-
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-    const system = `You are a program coordinator assistant for CreateAccess, a nonprofit that brings basketball and technology programs to youth organizations. Write in a warm, encouraging, professional tone. Be concise — one sentence per bullet point.`;
-
-    // Send only safe, summary-style info to the AI.
-    const userPrompt = `Generate a weekly partnership digest using only aggregated, non-identifying data. Today is ${new Date().toDateString()}.
-
-New inquiries this week: ${aiData.newIntakesCount}
-Partners with updates this week: ${aiData.statusChangesCount}
-Timelines coming up (next 30 days): ${aiData.upcomingTimelineCount}
-Active partners needing follow-up: ${aiData.quietPartnersCount}
-Total active partners: ${aiData.totalActive}
-Status change breakdown: ${JSON.stringify(aiData.statusChangeSummary)}
-
-Write the digest using exactly these markdown sections:
-## 🆕 New Inquiries This Week
-## 🔄 Recent Updates
-## 📅 Timelines to Watch
-## 🔇 Follow Up Needed
-## 📊 Quick Stats
-
-If a section has no data write "Nothing to report this week."
-End with one short sentence of encouragement for the team.`;
-
-    const resp = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: userPrompt },
-      ],
-      max_tokens: 1000,
-      temperature: 0.4,
-    });
-
-    const markdown = resp.choices?.[0]?.message?.content || '';
-    const html: string = await Promise.resolve(marked.parse(markdown));
-
-    // collect admin emails (only keep valid email addresses)
-    const admins = await prisma.user.findMany({ where: { role: 'admin' } as any, select: { username: true, email: true } as any });
-    const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-    const adminEmailsRaw = admins.map((a: any) => a.email || a.username).filter(Boolean);
-    const adminEmails = adminEmailsRaw.filter((e: string) => emailRegex.test(e));
-    const invalid = adminEmailsRaw.filter((e: string) => !emailRegex.test(e));
-    if (invalid.length > 0) console.warn('digest send: invalid admin email addresses, skipping:', invalid);
-
-    if (adminEmails.length === 0) {
-      console.warn('digest send: no valid admin email addresses found in users, checking ADMIN_EMAILS env');
-      const envList = (process.env.ADMIN_EMAILS || '').split(',').map((s) => s.trim()).filter(Boolean);
-      const envValid = envList.filter((e: string) => emailRegex.test(e));
-      if (envValid.length > 0) {
-        adminEmails.push(...envValid);
-      }
+    if (result.sent.length === 0) {
+      return NextResponse.json({ error: 'Digest could not be sent to anyone', failed: result.failed }, { status: 502 });
     }
-
-    if (adminEmails.length === 0) {
-      console.error('digest send: no valid admin email addresses found; aborting send');
-      return NextResponse.json({ error: 'No admin email addresses configured' }, { status: 400 });
-    } else {
-      const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-      const subject: string = `CreateAccess Weekly Digest — ${dateStr}`;
-      await sendHtmlEmail(adminEmails, subject, html);
-    }
-
-    return NextResponse.json({ ok: true, sentTo: adminEmails });
+    return NextResponse.json({ ok: true, sentTo: result.sent, failed: result.failed });
   } catch (err: any) {
     console.error('digest send error', err);
     return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
   }
+}
+
+// Scheduled weekly send (Vercel Cron, see vercel.json).
+export async function GET(req: NextRequest) {
+  if (!isCronRequest(req.headers.get('authorization'))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  return send();
+}
+
+// "Email Admins" button on /admin/digest.
+export async function POST(req: NextRequest) {
+  const user = await getSessionFromToken(req.cookies.get(SESSION_COOKIE_NAME)?.value);
+  if (!user || !isAdmin(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  return send();
 }

@@ -4,7 +4,6 @@ import { prisma, hasColumn, clearColumnCache } from '@/lib/db';
 import { getSessionFromToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 import { sendEmailVerification } from '@/lib/email';
 import apiError from '@/lib/apiError';
-import ensureEnvLoaded from '@/lib/loadEnv';
 
 function validEmail(e: string) {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
@@ -72,12 +71,6 @@ export async function POST(req: NextRequest) {
     await prisma.user.update({ where: { id: dbUser.id }, data: { pending_email: normalized } as any });
 
     const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/verify-email?token=${token}`;
-
-    // Ensure local .env is loaded if env vars were added after the server started
-    ensureEnvLoaded();
-    console.log('Attempting email send to:', normalized);
-    console.log('RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY);
-    console.log('Verify URL:', verifyUrl);
 
     try {
       await sendEmailVerification(normalized, verifyUrl);

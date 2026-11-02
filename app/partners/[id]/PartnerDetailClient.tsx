@@ -35,7 +35,6 @@ export function PartnerDetailClient({
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [noteBody, setNoteBody] = useState('');
-  const [noteAuthor, setNoteAuthor] = useState('');
   const [showAddNote, setShowAddNote] = useState(false);
 
   const updateStatus = async (status: PartnerStatus) => {
@@ -56,7 +55,7 @@ export function PartnerDetailClient({
     const res = await fetch(`/api/partners/${partner.id}/notes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ body: noteBody, author: noteAuthor || undefined }),
+      body: JSON.stringify({ body: noteBody }),
     });
     if (res.ok) {
       const { note } = await res.json();
@@ -295,13 +294,7 @@ export function PartnerDetailClient({
                 autoFocus
               />
               <div className="flex gap-2 items-center">
-                <input
-                  type="text"
-                  value={noteAuthor}
-                  onChange={(e) => setNoteAuthor(e.target.value)}
-                  placeholder="Your name (optional)"
-                  className="input-base flex-1"
-                />
+                <span className="flex-1 text-sm text-ink/50">Saved under your name</span>
                 <button type="submit" className="btn-primary" disabled={!noteBody.trim() || isPending}>
                   <Send size={14} />
                   Save Note

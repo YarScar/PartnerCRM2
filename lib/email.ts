@@ -1,9 +1,55 @@
 import { Resend } from 'resend';
-import ensureEnvLoaded from './loadEnv';
+
+// Resend's shared test sender only delivers to the Resend account owner's own
+// address, so production must send from a domain verified in Resend (EMAIL_FROM).
+const DEV_FALLBACK_FROM = 'PartnerCRM <onboarding@resend.dev>';
+
+export type SendResult = { sent: string[]; failed: { to: string; error: string }[] };
 
 function getResend() {
-  ensureEnvLoaded();
+  if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is missing');
   return new Resend(process.env.RESEND_API_KEY);
+}
+
+function getFrom() {
+  const from = process.env.EMAIL_FROM?.trim();
+  if (from) return from;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('EMAIL_FROM is missing (use an address on a domain verified in Resend)');
+  }
+  return DEV_FALLBACK_FROM;
+}
+
+export function escapeHtml(value: unknown) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function sendOne(to: string, subject: string, html: string, text: string) {
+  const resend = getResend();
+  const { error } = (await resend.emails.send({ from: getFrom(), to, subject, html, text })) as any;
+  if (error) throw new Error(error.message || 'Resend error');
+}
+
+// Each recipient gets their own message (no one sees the other addresses), and one
+// bad address doesn't stop the rest. Callers decide what a partial failure means.
+async function sendToEach(to: string[], subject: string, html: string, text: string): Promise<SendResult> {
+  const result: SendResult = { sent: [], failed: [] };
+  for (const recipient of to) {
+    try {
+      await sendOne(recipient, subject, html, text);
+      result.sent.push(recipient);
+    } catch (err: any) {
+      const error = err?.message || String(err);
+      console.error('email send failed', { to: recipient, subject, error });
+      result.failed.push({ to: recipient, error });
+    }
+  }
+  return result;
 }
 
 function wrapHtml(bodyHtml: string, title = 'CreateAccess Weekly Digest', preheader = '') {
@@ -72,7 +118,7 @@ function wrapHtml(bodyHtml: string, title = 'CreateAccess Weekly Digest', prehea
 
           <div class="footer">
             <p style="margin:12px 0 0">Thanks — the CreateAccess team</p>
-            <p class="small" style="margin:6px 0 0">If you no longer wish to receive these emails, update your notification preferences in the dashboard.</p>
+            <p class="small" style="margin:6px 0 0">You're receiving this as a CreateAccess admin. To stop, ask another admin to change your role or email.</p>
           </div>
         </div>
       </div>
@@ -93,19 +139,10 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
     <p style="color:#6b6b6b;font-size:13px;word-break:break-all">${resetUrl}</p>
   `;
 
-  const html = wrapHtml(htmlBody);
+  const html = wrapHtml(htmlBody, subject);
   const text = `Reset your CreateAccess password\n\nOpen the link to reset your password: ${resetUrl}`;
 
-  if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is missing');
-  const resend = getResend();
-  const { data, error } = (await resend.emails.send({
-    from: 'PartnerCRM <onboarding@resend.dev>',
-    to,
-    subject,
-    html,
-    text,
-  })) as any;
-  if (error) throw new Error(error.message || 'Resend error');
+  await sendOne(to, subject, html, text);
 }
 
 export async function sendIntakeNotification(adminEmails: string[], partner: {
@@ -117,8 +154,9 @@ export async function sendIntakeNotification(adminEmails: string[], partner: {
   programType?: string;
   timeline?: string;
   createdAt: Date;
-}): Promise<void> {
-  const subject = `New intake form — ${partner.organizationName}`;
+}): Promise<SendResult> {
+  // Everything here except the id and date comes from the public intake form.
+  const subject = `New intake form — ${partner.organizationName}`.replace(/\s+/g, ' ');
 
   const rows = [
     ['Organization', partner.organizationName],
@@ -135,15 +173,15 @@ export async function sendIntakeNotification(adminEmails: string[], partner: {
     .map(
       ([k, v]) => `
       <tr>
-        <td style="padding:6px 8px;border-bottom:1px solid #f1f1f1;font-weight:600;width:35%">${k}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #f1f1f1">${v}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f1f1f1;font-weight:600;width:35%">${escapeHtml(k)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f1f1f1">${escapeHtml(v)}</td>
       </tr>`
     )
     .join('')}
     </table>
   `;
 
-  const viewUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/partners/${partner.id}`;
+  const viewUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/partners/${encodeURIComponent(String(partner.id))}`;
   const htmlBody = `
     <h2 style="color:#1a1a1a;margin:0 0 8px">New CreateAccess intake submission</h2>
     ${table}
@@ -152,47 +190,17 @@ export async function sendIntakeNotification(adminEmails: string[], partner: {
     </div>
   `;
 
-  const html = wrapHtml(htmlBody);
-  const text = `New intake: ${partner.organizationName}\nView: ${viewUrl}`;
+  const html = wrapHtml(htmlBody, 'New intake submission');
+  const text = [...rows.map(([k, v]) => `${k}: ${v}`), '', `View: ${viewUrl}`].join('\n');
 
-  if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is missing');
-  const resend = getResend();
-  for (const recipient of adminEmails) {
-    try {
-      const { data, error } = (await resend.emails.send({
-        from: 'PartnerCRM <onboarding@resend.dev>',
-        to: recipient,
-        subject,
-        html,
-        text,
-      })) as any;
-      if (error) throw new Error(error.message || 'Resend error');
-    } catch (err) {
-      console.error('sendIntakeNotification error for', recipient, err);
-    }
-  }
+  return sendToEach(adminEmails, subject, html, text);
 }
 
-export async function sendHtmlEmail(to: string[], subject: string, htmlContent: string): Promise<void> {
-  const preheader = subject;
-  const html = wrapHtml(htmlContent, subject, preheader);
-  const text = htmlContent.replace(/<[^>]+>/g, '');
-  if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is missing');
-  const resend = getResend();
-  for (const t of to) {
-    try {
-      const { data, error } = (await resend.emails.send({
-        from: 'PartnerCRM <onboarding@resend.dev>',
-        to: t,
-        subject,
-        html,
-        text,
-      })) as any;
-      if (error) throw new Error(error.message || 'Resend error');
-    } catch (err) {
-      console.error('sendHtmlEmail error for', t, err);
-    }
-  }
+// `text` should be the plain-text source (e.g. the digest's markdown); stripping
+// tags from the HTML is only a fallback.
+export async function sendHtmlEmail(to: string[], subject: string, htmlContent: string, text?: string): Promise<SendResult> {
+  const html = wrapHtml(htmlContent, escapeHtml(subject), escapeHtml(subject));
+  return sendToEach(to, subject, html, text ?? htmlContent.replace(/<[^>]+>/g, ''));
 }
 
 export async function sendEmailVerification(to: string, verifyUrl: string): Promise<void> {
@@ -210,14 +218,5 @@ export async function sendEmailVerification(to: string, verifyUrl: string): Prom
   const html = wrapHtml(htmlBody, subject, 'Verify your CreateAccess email');
   const text = `Verify your CreateAccess email: ${verifyUrl}`;
 
-  if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is missing');
-  const resend = getResend();
-  const { data, error } = (await resend.emails.send({
-    from: 'PartnerCRM <onboarding@resend.dev>',
-    to,
-    subject,
-    html,
-    text,
-  })) as any;
-  if (error) throw new Error(error.message || 'Resend error');
+  await sendOne(to, subject, html, text);
 }

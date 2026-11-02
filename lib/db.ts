@@ -14,8 +14,15 @@ if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
 }
 
+// false = use the in-memory mock store (lib/mock-data.ts), which is for local
+// prototyping only. In production a missing DATABASE_URL is a misconfiguration:
+// fail loudly rather than accept intake forms into memory and lose them.
 export function hasDb(): boolean {
-  return !!process.env.DATABASE_URL;
+  if (process.env.DATABASE_URL) return true;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('DATABASE_URL is not set');
+  }
+  return false;
 }
 
 // Cache for column existence checks to avoid repeated queries during a request-heavy period.

@@ -1,3 +1,4 @@
+// Imported by middleware.ts (Edge runtime): keep Node-only modules out of this file.
 import { prisma } from './db';
 
 export type UserRole = 'admin' | 'staff';
@@ -7,6 +8,16 @@ export interface AuthUser {
   displayName: string;
   role: UserRole;
   email?: string;
+  // Set for accounts created with a temporary password (scripts/create-users.ts):
+  // middleware sends them to Settings until they choose their own.
+  mustChangePassword?: boolean;
+}
+
+// Where someone who still has to replace their temporary password may go.
+const ALLOWED_BEFORE_PASSWORD_CHANGE = ['/settings', '/api/account/change-password', '/api/auth/logout', '/api/auth/me', '/login'];
+
+export function allowedBeforePasswordChange(pathname: string) {
+  return ALLOWED_BEFORE_PASSWORD_CHANGE.includes(pathname);
 }
 
 export interface SessionPayload extends AuthUser {
@@ -16,9 +27,21 @@ export interface SessionPayload extends AuthUser {
 export const SESSION_COOKIE_NAME = 'createaccess_session';
 // Keep sessions alive for a week so staff do not have to log in constantly.
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
-// Use a real secret in production. The dev fallback keeps local work simple.
-const AUTH_SECRET = process.env.AUTH_SECRET || process.env.NEXT_PUBLIC_AUTH_SECRET || 'createaccess-dev-secret';
 const SALT_ROUNDS = 12;
+export const MIN_PASSWORD_LENGTH = 8;
+const DEV_AUTH_SECRET = 'createaccess-dev-secret';
+
+// Anyone who knows the signing secret can forge an admin session, so production
+// refuses to run on the public dev fallback (or a short secret). Read per call,
+// not at import, so `next build` works without the secret.
+export function getAuthSecret(env: Record<string, string | undefined> = process.env): string {
+  const secret = env.AUTH_SECRET?.trim();
+  if (secret && secret.length >= 32) return secret;
+  if (env.NODE_ENV === 'production') {
+    throw new Error('AUTH_SECRET must be set to a random string of at least 32 characters');
+  }
+  return secret || DEV_AUTH_SECRET;
+}
 
 function toBase64Url(value: string) {
   return btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
@@ -33,7 +56,7 @@ function fromBase64Url(value: string) {
 async function importKey() {
   return crypto.subtle.importKey(
     'raw',
-    new TextEncoder().encode(AUTH_SECRET),
+    new TextEncoder().encode(getAuthSecret()),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign', 'verify']
@@ -83,20 +106,22 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 }
 
 /**
- * Authenticate user with database-backed credentials.
- * IMPORTANT: Passwords are hashed using SHA-256 (suitable for development).
- * For production, use bcrypt or similar with salt rounds.
+ * Authenticate user with database-backed credentials (bcrypt; old SHA-256 hashes are
+ * still accepted and upgraded on the next successful login).
  */
 export async function authenticate(username: string, password: string): Promise<AuthUser | null> {
-  // Look up the account first, then compare the password.
-  const account = await prisma.user.findUnique({
-    where: { username: username.trim() },
+  // Look up the account first, then compare the password. Usernames are matched
+  // case-insensitively so people whose username is their email can type it any way.
+  const account = await prisma.user.findFirst({
+    where: { username: { equals: username.trim(), mode: 'insensitive' } },
     select: {
       id: true,
       username: true,
       password_hash: true,
       display_name: true,
       role: true,
+      email: true,
+      must_change_password: true,
     },
   });
 
@@ -105,15 +130,23 @@ export async function authenticate(username: string, password: string): Promise<
   const passwordValid = await verifyPassword(password, account.password_hash);
   if (!passwordValid) return null;
 
+  // Upgrade an old unsalted SHA-256 hash to bcrypt now that we have the plain password.
+  if (!account.password_hash.startsWith('$2')) {
+    await prisma.user.update({ where: { id: account.id }, data: { password_hash: await hashPassword(password) } });
+  }
+
   return {
     username: account.username,
     displayName: account.display_name,
     role: account.role as UserRole,
+    email: account.email ?? undefined,
+    mustChangePassword: account.must_change_password,
   };
 }
 
 /**
- * Change password for authenticated user using database.
+ * Set a user's own new password. Also clears the "must change password" flag set
+ * for accounts created with a temporary password.
  */
 export async function changePassword(username: string, newPassword: string): Promise<boolean> {
   // Re-hash the new password before storing it.
@@ -122,7 +155,7 @@ export async function changePassword(username: string, newPassword: string): Pro
   try {
     await prisma.user.update({
       where: { username },
-      data: { password_hash: passwordHash },
+      data: { password_hash: passwordHash, must_change_password: false },
     });
     return true;
   } catch {
@@ -136,7 +169,9 @@ export async function createSessionToken(user: AuthUser): Promise<string> {
     ...user,
     exp: Date.now() + SESSION_TTL_MS,
   };
-  const encodedPayload = toBase64Url(JSON.stringify(payload));
+  // btoa only takes Latin-1, so encode the JSON as UTF-8 bytes first: a display name
+  // like "José" or "Nguyễn" would otherwise make login throw.
+  const encodedPayload = toBase64Url(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(payload))));
   const signature = await signPayload(encodedPayload);
   return `${encodedPayload}.${signature}`;
 }
@@ -146,18 +181,18 @@ export async function getSessionFromToken(token?: string | null): Promise<AuthUs
   const [encodedPayload, signature] = token.split('.');
   if (!encodedPayload || !signature) return null;
 
-  // If the signature fails, treat the token like it never existed.
-  const valid = await verifySignature(encodedPayload, signature);
-  if (!valid) return null;
-
   try {
-    const payload = JSON.parse(fromBase64Url(encodedPayload)) as SessionPayload;
+    // If the signature fails (or isn't even valid base64), treat the token like it never existed.
+    if (!(await verifySignature(encodedPayload, signature))) return null;
+    const bytes = Uint8Array.from(fromBase64Url(encodedPayload), (char) => char.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder().decode(bytes)) as SessionPayload;
     if (!payload.exp || payload.exp < Date.now()) return null;
     return {
       username: payload.username,
       displayName: payload.displayName,
       role: payload.role,
-      email: (payload as any).email,
+      email: payload.email,
+      mustChangePassword: payload.mustChangePassword === true,
     };
   } catch {
     return null;

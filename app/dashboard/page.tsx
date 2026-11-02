@@ -29,7 +29,7 @@ export default async function DashboardPage() {
           </h1>
           <p className="text-ink/60 mt-2">
             {partners.length} partner{partners.length !== 1 ? 's' : ''} tracked.
-            Last activity {new Date(partners[0]?.updated_at || Date.now()).toLocaleDateString()}.
+            {partners[0] ? ` Last activity ${new Date(partners[0].updated_at).toLocaleDateString()}.` : ''}
           </p>
         </div>
         <Link href="/partners/new" className="btn-primary">

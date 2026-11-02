@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromToken, isAdmin, SESSION_COOKIE_NAME } from '@/lib/auth';
+import { allowedBeforePasswordChange, getSessionFromToken, isAdmin, SESSION_COOKIE_NAME } from '@/lib/auth';
 
 const PUBLIC_PATHS = [
   '/',
@@ -44,6 +44,23 @@ export async function middleware(request: NextRequest) {
   if (PUBLIC_PATHS.includes(pathname) || pathname.startsWith('/_next') || pathname === '/favicon.ico') {
     // Even public pages still get the safe headers.
     return applySecurityHeaders(NextResponse.next());
+  }
+
+  // Someone still on a temporary password can only reach Settings until they set their own.
+  const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  if (sessionCookie && !allowedBeforePasswordChange(pathname)) {
+    const session = await getSessionFromToken(sessionCookie);
+    if (session?.mustChangePassword) {
+      if (pathname.startsWith('/api/')) {
+        return applySecurityHeaders(
+          NextResponse.json({ error: 'Set your own password in Settings first' }, { status: 403 })
+        );
+      }
+      const settingsUrl = request.nextUrl.clone();
+      settingsUrl.pathname = '/settings';
+      settingsUrl.search = '';
+      return applySecurityHeaders(NextResponse.redirect(settingsUrl));
+    }
   }
 
   if (!isProtectedPath(pathname)) {

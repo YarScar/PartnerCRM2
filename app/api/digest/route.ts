@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { getSessionFromToken, isAdmin, SESSION_COOKIE_NAME } from '@/lib/auth';
-import { getDigestData, sanitizeDigestForAI } from '@/lib/digest';
+import { getDigestData, renderDigest } from '@/lib/digest';
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,51 +9,9 @@ export async function GET(req: NextRequest) {
     if (!user || !isAdmin(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const data = await getDigestData();
-    // Turn the digest into a safer summary before sending it to the AI.
-    const aiData = sanitizeDigestForAI(data);
+    const { html } = renderDigest(data);
 
-    if (!process.env.OPENAI_API_KEY) {
-      console.error('OPENAI_API_KEY missing in environment');
-      return NextResponse.json({ error: 'OPENAI_API_KEY missing' }, { status: 500 });
-    }
-
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-    const system = `You are a program coordinator assistant for CreateAccess, a nonprofit that brings basketball and technology programs to youth organizations. Write in a warm, encouraging, professional tone. Be concise — one sentence per bullet point.`;
-
-    // Send only safe, summary-style info to the AI.
-    const userPrompt = `Generate a weekly partnership digest using only aggregated, non-identifying data. Today is ${new Date().toDateString()}.
-
-New inquiries this week: ${aiData.newIntakesCount}
-Partners with updates this week: ${aiData.statusChangesCount}
-Timelines coming up (next 30 days): ${aiData.upcomingTimelineCount}
-Active partners needing follow-up: ${aiData.quietPartnersCount}
-Total active partners: ${aiData.totalActive}
-Status change breakdown: ${JSON.stringify(aiData.statusChangeSummary)}
-
-Write the digest using exactly these markdown sections:
-## 🆕 New Inquiries This Week
-## 🔄 Recent Updates
-## 📅 Timelines to Watch
-## 🔇 Follow Up Needed
-## 📊 Quick Stats
-
-If a section has no data write "Nothing to report this week."
-End with one short sentence of encouragement for the team.`;
-
-    const resp = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: userPrompt },
-      ],
-      max_tokens: 1000,
-      temperature: 0.4,
-    });
-
-    const markdown = resp.choices?.[0]?.message?.content || '';
-
-    return NextResponse.json({ markdown, generatedAt: new Date().toISOString(), data });
+    return NextResponse.json({ html, generatedAt: new Date().toISOString(), data });
   } catch (err: any) {
     console.error('digest GET error', err);
     return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });

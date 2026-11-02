@@ -40,7 +40,28 @@ Open [http://localhost:3000](http://localhost:3000). The app runs out of the box
   ```
 6. Restart `npm run dev`. The dashboard now shows a "Connected to Neon Postgres" indicator and writes to your database.
 
-When `DATABASE_URL` is unset, the app transparently falls back to the in-memory mock store at `lib/mock-data.ts`.
+When `DATABASE_URL` is unset in local development, the app falls back to the in-memory mock store at `lib/mock-data.ts`. Production refuses to start without it.
+
+`npm run db:migrate` (`prisma migrate dev`) is for creating migrations against a development database only. To apply committed migrations to the production database, run `npm run db:deploy` (`prisma migrate deploy`) with the production `DATABASE_URL`, before deploying code that needs them.
+
+## Creating accounts
+
+1. Copy `users.example.json` to `users.local.json` (gitignored) and fill in each person's email, name, role (`admin` or `staff`) and a temporary password (8+ characters).
+2. Run `npm run users:create`. It uses the `DATABASE_URL` in `.env.local`; to create accounts on the live site, point that at the production database.
+3. Delete `users.local.json`, then send each person their temporary password privately.
+
+They sign in with their email and the temporary password, and must choose their own password before the rest of the app opens. Existing accounts are never changed.
+
+## Checks
+
+| Command | What it does |
+|---|---|
+| `npm run lint` | ESLint (Next.js rules) |
+| `npm run typecheck` | TypeScript, no output |
+| `npm test` | Unit tests (`tests/*.test.ts`, Node's built-in test runner) |
+| `npm run build` | Production build |
+
+GitHub Actions (`.github/workflows/ci.yml`) runs all four, plus `prisma validate`, on every pull request and push to `main`. Vercel builds a preview of every pull request; use it to check anything that needs the real database or email before merging. Dependabot opens weekly pull requests for dependency updates.
 
 ## Project structure
 
@@ -63,11 +84,11 @@ lib/
   types.ts                 — Partner, PartnerStatus, HARDWARE_CHECKLIST, etc.
   mock-data.ts             — seed data + in-memory CRUD for prototype mode
 db/
-  schema.sql               — PostgreSQL schema (partners, notes, statuses, form_config)
-  init.ts                  — Prisma setup helper (status upserts)
-  seed.ts                  — seeds default status labels/colors
+  seed.ts                  — seeds statuses, the admin/staff accounts and sample partners
 prisma/
-  schema.prisma            — Prisma models mapped to existing SQL tables
+  schema.prisma            — the database schema (source of truth)
+  migrations/              — every schema change, applied with `prisma migrate deploy`
+tests/                     — unit tests (`npm test`)
 ```
 
 ## Features (mapping back to your README)
@@ -82,12 +103,45 @@ prisma/
 - **Admin permissions:** admin accounts can open the form configurator and delete partners; staff can manage partners and notes.
 - **Admin form configurator:** add/remove sections and fields, rename labels, toggle visibility, mark required (changes persist to localStorage in this prototype — wire to the `form_config` table for production).
 
+## Email notifications
+
+Two emails go out through [Resend](https://resend.com):
+
+| Email | When | Code |
+|---|---|---|
+| New intake | Right after someone submits the public intake form | `app/api/intake/route.ts` → `lib/notifications.ts` `notifyNewIntake` |
+| Weekly digest | Mondays 09:00 UTC (Vercel Cron, `vercel.json`), or **Email Admins** on `/admin/digest` | `app/api/digest/send/route.ts` → `sendWeeklyDigest` |
+
+**Recipients:** every admin whose email is verified (Settings → verify email) plus the
+comma-separated `NOTIFICATION_EMAILS`. Admin *usernames* are never used as addresses.
+
+**Required settings (Vercel → Project → Settings → Environment Variables):**
+
+- `DATABASE_URL` — production refuses to run without it (no silent mock-data fallback).
+- `AUTH_SECRET` — at least 32 random characters (`openssl rand -hex 32`); signs login
+  cookies. Production refuses to run without it. Changing it signs everyone out.
+- `RESEND_API_KEY` — from the Resend account that owns the sending domain.
+- `EMAIL_FROM` — e.g. `CreateAccess <notifications@yourdomain.org>`, on a domain verified in
+  Resend (SPF/DKIM DNS records added). Resend's test sender `onboarding@resend.dev` only
+  delivers to the Resend account owner, so production refuses to send without `EMAIL_FROM`.
+- `NOTIFICATION_EMAILS` — a shared inbox, so notifications survive staff changes.
+- `CRON_SECRET` — any long random string; Vercel sends it to the cron route automatically.
+  Without it the scheduled digest returns 401.
+
+The digest is built straight from the database (`lib/digest.ts` `renderDigest`): new
+inquiries, recently updated partners, timelines in the next 30 days, and active partners
+with no note in 14 days. The app uses no AI services.
+
+**Checking it works:** `GET /api/health` shows which of these are set (true/false only).
+`npm run test:email -- you@example.org` sends one test email with the current settings.
+Failed sends are logged as `email send failed` in Vercel → Logs, and the Email Admins button
+reports who it reached and who it didn't. `npm test` runs the unit tests.
+
 ## Next steps
 
 - Wire admin configurator changes to the `form_config` table (schema is already there).
 - Upgrade authentication hardening for production (the current app already uses a lightweight custom login/session flow).
 - Add file uploads for partner documents (Neon doesn't store files; pair with S3 or Vercel Blob).
-- Email notifications when intake forms come in.
 - Export to CSV.
 
 ## Form configuration & public intake (current)

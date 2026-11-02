@@ -6,3 +6,13 @@ node_modules
 .DS_Store
 dist
 build
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+.env*.local
+
+.vercel
+.env*
+
+# Account list with temporary passwords (scripts/create-users.ts)
+*.local.json

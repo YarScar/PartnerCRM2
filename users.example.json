@@ -1,0 +1,5 @@
+[
+  { "email": "first.admin@example.org", "name": "First Admin", "role": "admin", "temporaryPassword": "change-me-1" },
+  { "email": "second.admin@example.org", "name": "Second Admin", "role": "admin", "temporaryPassword": "change-me-2" },
+  { "email": "staff.member@example.org", "name": "Staff Member", "role": "staff", "temporaryPassword": "change-me-3" }
+]

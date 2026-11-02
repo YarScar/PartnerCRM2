@@ -44,7 +44,7 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
       </div>
 
       <label className="block">
-        <span className="label-base">Username</span>
+        <span className="label-base">Email or username</span>
         <div className="relative">
           <UserRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink/40" />
           <input
@@ -52,7 +52,7 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
             onChange={(event) => setUsername(event.target.value)}
             className="input-base pl-9"
             autoComplete="username"
-            placeholder="admin"
+            placeholder="you@example.org"
           />
         </div>
       </label>

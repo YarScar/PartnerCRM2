@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromToken, changePassword, SESSION_COOKIE_NAME } from '@/lib/auth';
+import {
+  authenticate,
+  changePassword,
+  createSessionToken,
+  getSessionFromToken,
+  MIN_PASSWORD_LENGTH,
+  SESSION_COOKIE_NAME,
+} from '@/lib/auth';
 import apiError from '@/lib/apiError';
+import { checkRateLimit, getRateLimitKey } from '@/lib/rateLimit';
+import { logAuditEvent } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,14 +18,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Guessing the current password from a stolen session should be slow too.
+    const rateLimit = checkRateLimit(getRateLimitKey(req, `change-password:${user.username}`), 5, 15 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json({ error: 'Too many attempts. Please try again later.' }, { status: 429 });
+    }
+
     const { currentPassword, newPassword } = await req.json();
 
-    if (!currentPassword || !newPassword) {
+    if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || !currentPassword || !newPassword) {
       return NextResponse.json({ error: 'Both passwords are required' }, { status: 400 });
     }
 
-    if (newPassword.length < 6) {
-      return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      return NextResponse.json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` }, { status: 400 });
+    }
+
+    // A session alone isn't enough to change the password: prove you know the current one.
+    if (!(await authenticate(user.username, currentPassword))) {
+      await logAuditEvent('change_password.wrong_current', { username: user.username });
+      return NextResponse.json({ error: 'Current password is incorrect' }, { status: 400 });
+    }
+
+    if (newPassword === currentPassword) {
+      return NextResponse.json({ error: 'Choose a password different from your current one' }, { status: 400 });
     }
 
     const success = await changePassword(user.username, newPassword);
@@ -24,7 +49,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to change password' }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true });
+    await logAuditEvent('change_password.completed', { username: user.username });
+    const response = NextResponse.json({ ok: true });
+    // Re-issue the cookie without the temporary-password flag so the rest of the app opens up.
+    if (user.mustChangePassword) {
+      response.cookies.set({
+        name: SESSION_COOKIE_NAME,
+        value: await createSessionToken({ ...user, mustChangePassword: false }),
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7,
+      });
+    }
+    return response;
   } catch (err: any) {
     return apiError(err);
   }
