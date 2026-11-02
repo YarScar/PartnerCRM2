@@ -1,5 +1,5 @@
-import OpenAI from 'openai';
 import { prisma } from './db';
+import { escapeHtml } from './email';
 
 export type DigestData = {
   newIntakes: { organizationName: string; contactName?: string; createdAt: Date }[];
@@ -8,39 +8,6 @@ export type DigestData = {
   quietPartners: { organizationName: string; contactName?: string; lastNoteAt: Date | null }[];
   totalActive: number;
 };
-
-export type DigestAIData = {
-  newIntakesCount: number;
-  statusChangesCount: number;
-  upcomingTimelineCount: number;
-  quietPartnersCount: number;
-  totalActive: number;
-  statusChangeSummary: Array<{ status: string; count: number }>;
-};
-
-// This keeps the AI summary simple and safer.
-// We do not send partner names or personal details.
-export function sanitizeDigestForAI(data: DigestData): DigestAIData {
-  // Count each status so the summary can talk about trends instead of names.
-  const statusCounts = data.statusChanges.reduce<Record<string, number>>((acc, item) => {
-    acc[item.status] = (acc[item.status] || 0) + 1;
-    return acc;
-  }, {});
-
-  const statusChangeSummary = Object.entries(statusCounts)
-    .map(([status, count]) => ({ status, count }))
-    .sort((a, b) => b.count - a.count || a.status.localeCompare(b.status));
-
-  // We only send counts and broad status groups to the AI.
-  return {
-    newIntakesCount: data.newIntakes.length,
-    statusChangesCount: data.statusChanges.length,
-    upcomingTimelineCount: data.upcomingTimelines.length,
-    quietPartnersCount: data.quietPartners.length,
-    totalActive: data.totalActive,
-    statusChangeSummary,
-  };
-}
 
 export async function getDigestData(): Promise<DigestData> {
   // Pull only the parts we need for the weekly digest.
@@ -97,45 +64,51 @@ export async function getDigestData(): Promise<DigestData> {
   return { newIntakes, statusChanges, upcomingTimelines, quietPartners, totalActive };
 }
 
-// One place for the AI prompt, shared by the preview page and the email send.
-export async function generateDigestMarkdown(data: DigestData): Promise<string> {
-  // Turn the digest into a safer summary before sending it to the AI.
-  const aiData = sanitizeDigestForAI(data);
+const EMPTY = 'Nothing to report this week.';
 
-  if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY missing');
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function shortDate(d: Date | string) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
-  const system = `You are a program coordinator assistant for CreateAccess, a nonprofit that brings basketball and technology programs to youth organizations. Write in a warm, encouraging, professional tone. Be concise — one sentence per bullet point.`;
+// Builds the digest straight from the data: same sections every week, no AI.
+// Partner names come from the public intake form, so every value is escaped.
+export function renderDigest(data: DigestData): { html: string; text: string } {
+  const sections: { title: string; items: string[] }[] = [
+    {
+      title: `New inquiries this week (${data.newIntakes.length})`,
+      items: data.newIntakes.map(
+        (p) => `${p.organizationName}${p.contactName ? ` — ${p.contactName}` : ''} (${shortDate(p.createdAt)})`
+      ),
+    },
+    {
+      title: `Recently updated partners (${data.statusChanges.length})`,
+      items: data.statusChanges.map((p) => `${p.organizationName} — ${p.status} (${shortDate(p.updatedAt)})`),
+    },
+    {
+      title: `Timelines in the next 30 days (${data.upcomingTimelines.length})`,
+      items: data.upcomingTimelines.map((p) => `${p.organizationName} — ${p.timeline}`),
+    },
+    {
+      title: `Active partners to follow up with (${data.quietPartners.length})`,
+      items: data.quietPartners.map(
+        (p) => `${p.organizationName} — ${p.lastNoteAt ? `last note ${shortDate(p.lastNoteAt)}` : 'no notes yet'}`
+      ),
+    },
+  ];
 
-  // Send only safe, summary-style info to the AI.
-  const userPrompt = `Generate a weekly partnership digest using only aggregated, non-identifying data. Today is ${new Date().toDateString()}.
+  const html =
+    sections
+      .map(
+        (s) =>
+          `<h2>${escapeHtml(s.title)}</h2>` +
+          (s.items.length ? `<ul>${s.items.map((i) => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : `<p>${EMPTY}</p>`)
+      )
+      .join('') + `<p class="stat">Total active partners: ${data.totalActive}</p>`;
 
-New inquiries this week: ${aiData.newIntakesCount}
-Partners with updates this week: ${aiData.statusChangesCount}
-Timelines coming up (next 30 days): ${aiData.upcomingTimelineCount}
-Active partners needing follow-up: ${aiData.quietPartnersCount}
-Total active partners: ${aiData.totalActive}
-Status change breakdown: ${JSON.stringify(aiData.statusChangeSummary)}
+  const text =
+    sections
+      .map((s) => `${s.title}\n${s.items.length ? s.items.map((i) => `- ${i}`).join('\n') : EMPTY}`)
+      .join('\n\n') + `\n\nTotal active partners: ${data.totalActive}`;
 
-Write the digest using exactly these markdown sections:
-## 🆕 New Inquiries This Week
-## 🔄 Recent Updates
-## 📅 Timelines to Watch
-## 🔇 Follow Up Needed
-## 📊 Quick Stats
-
-If a section has no data write "Nothing to report this week."
-End with one short sentence of encouragement for the team.`;
-
-  const resp = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: userPrompt },
-    ],
-    max_tokens: 1000,
-    temperature: 0.4,
-  });
-
-  return resp.choices?.[0]?.message?.content || '';
+  return { html, text };
 }

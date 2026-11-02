@@ -103,7 +103,10 @@ comma-separated `NOTIFICATION_EMAILS`. Admin *usernames* are never used as addre
 - `NOTIFICATION_EMAILS` — a shared inbox, so notifications survive staff changes.
 - `CRON_SECRET` — any long random string; Vercel sends it to the cron route automatically.
   Without it the scheduled digest returns 401.
-- `OPENAI_API_KEY` — the digest text is generated from counts only (no partner names).
+
+The digest is built straight from the database (`lib/digest.ts` `renderDigest`): new
+inquiries, recently updated partners, timelines in the next 30 days, and active partners
+with no note in 14 days. The app uses no AI services.
 
 **Checking it works:** `GET /api/health` shows which of these are set (true/false only).
 `npm run test:email -- you@example.org` sends one test email with the current settings.

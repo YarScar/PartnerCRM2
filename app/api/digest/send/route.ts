@@ -3,7 +3,7 @@ import { getSessionFromToken, isAdmin, SESSION_COOKIE_NAME } from '@/lib/auth';
 import { isCronRequest } from '@/lib/cron';
 import { sendWeeklyDigest } from '@/lib/notifications';
 
-// The digest takes an AI call plus one email per admin.
+// One email per admin, sent one after another.
 export const maxDuration = 60;
 
 async function send() {

@@ -2,33 +2,31 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { sanitizeDigestForAI } from '../lib/digest';
+import { renderDigest } from '../lib/digest';
 
-describe('sanitizeDigestForAI', () => {
-  it('removes identifying names and keeps only aggregated counts', () => {
-    const input = {
-      newIntakes: [{ organizationName: 'Bright Futures', contactName: 'Jane', createdAt: new Date('2026-08-06') }],
-      statusChanges: [
-        { organizationName: 'Bright Futures', contactName: 'Jane', status: 'Active Partner', updatedAt: new Date('2026-08-06') },
-        { organizationName: 'Northside Youth', contactName: 'Sam', status: 'Pending Intake', updatedAt: new Date('2026-08-06') },
-      ],
-      upcomingTimelines: [{ organizationName: 'Northside Youth', contactName: 'Sam', timeline: '2026-08-15', firmDates: '2026-08-15' }],
-      quietPartners: [{ organizationName: 'Eastside Group', contactName: 'Dana', lastNoteAt: null }],
-      totalActive: 3,
-    };
+describe('renderDigest', () => {
+  const input = {
+    newIntakes: [{ organizationName: 'Bright <b>Futures</b>', contactName: 'Jane', createdAt: new Date('2026-08-06') }],
+    statusChanges: [
+      { organizationName: 'Northside Youth', contactName: 'Sam', status: 'Active Partner', updatedAt: new Date('2026-08-06') },
+    ],
+    upcomingTimelines: [],
+    quietPartners: [{ organizationName: 'Eastside Group', contactName: 'Dana', lastNoteAt: null }],
+    totalActive: 3,
+  };
 
-    const output = sanitizeDigestForAI(input as any);
+  it('lists each section with counts and says when a section is empty', () => {
+    const { text } = renderDigest(input);
+    assert.match(text, /New inquiries this week \(1\)\n- Bright <b>Futures<\/b> — Jane/);
+    assert.match(text, /Northside Youth — Active Partner/);
+    assert.match(text, /Timelines in the next 30 days \(0\)\nNothing to report this week\./);
+    assert.match(text, /Eastside Group — no notes yet/);
+    assert.match(text, /Total active partners: 3$/);
+  });
 
-    assert.equal(output.newIntakesCount, 1);
-    assert.equal(output.statusChangesCount, 2);
-    assert.equal(output.upcomingTimelineCount, 1);
-    assert.equal(output.quietPartnersCount, 1);
-    assert.equal(output.totalActive, 3);
-    assert.deepEqual(output.statusChangeSummary, [
-      { status: 'Active Partner', count: 1 },
-      { status: 'Pending Intake', count: 1 },
-    ]);
-    assert.ok(!JSON.stringify(output).includes('Bright Futures'));
-    assert.ok(!JSON.stringify(output).includes('Jane'));
+  it('escapes partner values in the HTML', () => {
+    const { html } = renderDigest(input);
+    assert.ok(html.includes('Bright &lt;b&gt;Futures&lt;/b&gt;'));
+    assert.ok(!html.includes('<b>Futures'));
   });
 });

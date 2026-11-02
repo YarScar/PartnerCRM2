@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromToken, isAdmin, SESSION_COOKIE_NAME } from '@/lib/auth';
-import { generateDigestMarkdown, getDigestData } from '@/lib/digest';
+import { getDigestData, renderDigest } from '@/lib/digest';
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,9 +9,9 @@ export async function GET(req: NextRequest) {
     if (!user || !isAdmin(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const data = await getDigestData();
-    const markdown = await generateDigestMarkdown(data);
+    const { html } = renderDigest(data);
 
-    return NextResponse.json({ markdown, generatedAt: new Date().toISOString(), data });
+    return NextResponse.json({ html, generatedAt: new Date().toISOString(), data });
   } catch (err: any) {
     console.error('digest GET error', err);
     return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });

@@ -1,8 +1,7 @@
-import { marked } from 'marked';
 import type { Partner } from './types';
 import { prisma, hasDb } from './db';
 import { sendHtmlEmail, sendIntakeNotification, type SendResult } from './email';
-import { generateDigestMarkdown, getDigestData } from './digest';
+import { getDigestData, renderDigest } from './digest';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -65,8 +64,7 @@ export async function sendWeeklyDigest(): Promise<NotifyResult> {
   const recipients = await getAdminRecipients();
   if (recipients.length === 0) return { sent: [], failed: [], skipped: 'no recipients' };
 
-  const markdown = await generateDigestMarkdown(await getDigestData());
-  const html = await Promise.resolve(marked.parse(markdown));
+  const { html, text } = renderDigest(await getDigestData());
   const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  return sendHtmlEmail(recipients, `CreateAccess Weekly Digest — ${dateStr}`, html, markdown);
+  return sendHtmlEmail(recipients, `CreateAccess Weekly Digest — ${dateStr}`, html, text);
 }
