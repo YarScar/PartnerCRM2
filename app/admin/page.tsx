@@ -5,6 +5,7 @@ import Link from 'next/link';
 import normalizeOptions from '@/lib/formConfigUtils';
 import { Plus, Trash2, Eye, EyeOff, GripVertical, Save } from 'lucide-react';
 import { FIELD_LIBRARY } from '@/lib/fieldLibrary';
+import { uniqueId } from '@/lib/formConfigSave';
 
 interface FormField {
   id: string;
@@ -72,6 +73,10 @@ const DEFAULT_CONFIG: FormSection[] = [
 export default function AdminPage() {
   const [config, setConfig] = useState<FormSection[]>(DEFAULT_CONFIG);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // What's in the database, to show "Unsaved changes" and warn before leaving.
+  const [savedSnapshot, setSavedSnapshot] = useState('');
   const [loading, setLoading] = useState(true);
   const [draggingField, setDraggingField] = useState<{ sectionId: string; fieldId: string } | null>(null);
 
@@ -93,6 +98,7 @@ export default function AdminPage() {
         if (res.ok) {
           const data = await res.json();
           setConfig(data);
+          setSavedSnapshot(JSON.stringify(data));
         }
       } catch (err) {
         console.error('Failed to load form config:', err);
@@ -103,9 +109,20 @@ export default function AdminPage() {
     loadConfig();
   }, []);
 
-  const save = async () => {
+  const dirty = !loading && JSON.stringify(config) !== savedSnapshot;
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
+  const postConfig = async (next: FormSection[]) => {
+    setSaving(true);
+    setError(null);
     try {
-      const orderedConfig = config.map((section, sectionIndex) => ({
+      const ordered = next.map((section, sectionIndex) => ({
         ...section,
         fields: section.fields.map((field, fieldIndex) => ({
           ...field,
@@ -116,37 +133,25 @@ export default function AdminPage() {
       const res = await fetch('/api/form-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderedConfig),
+        body: JSON.stringify(ordered),
       });
-      if (res.ok) {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-      }
-    } catch (err) {
-      console.error('Failed to save form config:', err);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Could not save. Nothing was changed.');
+      setSavedSnapshot(JSON.stringify(next));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err: any) {
+      setError(err?.message || 'Could not save. Nothing was changed.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const reset = async () => {
-    // perform reset without blocking prompt UI
-    setConfig(DEFAULT_CONFIG);
-    try {
-      const orderedDefaults = DEFAULT_CONFIG.map((section, sectionIndex) => ({
-        ...section,
-        fields: section.fields.map((field, fieldIndex) => ({
-          ...field,
-          sort_order: sectionIndex * 100 + fieldIndex,
-        })),
-      }));
+  const save = () => postConfig(config);
 
-      await fetch('/api/form-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderedDefaults),
-      });
-    } catch (err) {
-      console.error('Failed to reset form config:', err);
-    }
+  const reset = () => {
+    setConfig(DEFAULT_CONFIG);
+    postConfig(DEFAULT_CONFIG);
   };
 
   const moveField = (sectionId: string, sourceFieldId: string, targetFieldId: string) => {
@@ -211,7 +216,8 @@ export default function AdminPage() {
   const addFieldConfirm = (sectionId: string) => {
     const label = newFieldLabel.trim();
     if (!label) return;
-    const id = label.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    // Unique across the whole form: the public intake form uses it as the input name.
+    const id = uniqueId(label, config.flatMap((s) => s.fields.map((f) => f.id)));
     setConfig(
       config.map((s) =>
         s.id !== sectionId
@@ -239,7 +245,7 @@ export default function AdminPage() {
   const addSectionConfirm = () => {
     const label = newSectionLabel.trim();
     if (!label) return;
-    const id = label.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const id = uniqueId(label, config.map((s) => s.id));
     setConfig([...config, { id, label, fields: [] }]);
     setAddingSection(false);
     setNewSectionLabel('');
@@ -321,11 +327,12 @@ export default function AdminPage() {
         </div>
         <div className="flex gap-2 items-center">
           {saved && <span className="text-sm text-emerald-700 font-medium">✓ Saved</span>}
-          <button onClick={reset} className="btn-ghost">
+          {!saved && dirty && <span className="text-sm text-amber-700 font-medium">Unsaved changes</span>}
+          <button onClick={reset} className="btn-ghost" disabled={saving}>
             Reset to Default
           </button>
-          <button onClick={save} className="btn-primary">
-            <Save size={14} /> Save Changes
+          <button onClick={save} className="btn-primary" disabled={saving}>
+            <Save size={14} /> {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
       </div>
@@ -333,6 +340,8 @@ export default function AdminPage() {
         Customize what fields appear on the partner intake form. Toggle visibility, mark fields as required,
         rename labels, or add new fields. Changes save to the database.
       </p>
+
+      {error && <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">{error}</div>}
 
       <div className="space-y-4">
         {loading ? (
