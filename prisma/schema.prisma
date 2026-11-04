@@ -59,6 +59,7 @@ model Partner {
   updated_at                DateTime @updatedAt @db.Timestamptz(6)
 
   notes PartnerNote[]
+  runs  ProgramRun[]
 
   @@index([status], map: "idx_partners_status")
   @@index([created_at(sort: Desc)], map: "idx_partners_created_at")
@@ -136,4 +137,107 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@map("password_reset_tokens")
+}
+
+// A program is the reusable idea (e.g. "Intro to 3D Printing"). Each time it actually
+// happens is a ProgramRun, which can be with a partner and can differ from the plan.
+model Program {
+  id             Int      @id @default(autoincrement())
+  name           String
+  description    String?
+  goals          String[] @default([])
+  age_min        Int?
+  age_max        Int?
+  audience_notes String?
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @updatedAt @db.Timestamptz(6)
+
+  runs       ProgramRun[]
+  activities ProgramActivity[]
+
+  @@map("programs")
+}
+
+// One time a program happened (or will). Starts with the program's activity plan,
+// then gets changed for this audience; what_changed records how it differed.
+model ProgramRun {
+  id                Int       @id @default(autoincrement())
+  program_id        Int
+  partner_id        Int?
+  name              String
+  status            String    @default("Planned")
+  start_date        DateTime? @db.Date
+  end_date          DateTime? @db.Date
+  location          String?
+  age_min           Int?
+  age_max           Int?
+  participant_count Int?
+  what_changed      String?
+  notes             String?
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime  @updatedAt @db.Timestamptz(6)
+
+  program    Program       @relation(fields: [program_id], references: [id], onDelete: Cascade)
+  partner    Partner?      @relation(fields: [partner_id], references: [id], onDelete: SetNull)
+  activities RunActivity[]
+
+  @@index([program_id], map: "idx_program_runs_program_id")
+  @@index([partner_id], map: "idx_program_runs_partner_id")
+  @@map("program_runs")
+}
+
+// The activity library. based_on_id links a twist back to the activity it came from.
+model Activity {
+  id               Int      @id @default(autoincrement())
+  name             String
+  summary          String?
+  category         String?
+  goals            String[] @default([])
+  age_min          Int?
+  age_max          Int?
+  duration_minutes Int?
+  group_size       String?
+  materials        String?
+  instructions     String?
+  based_on_id      Int?
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @updatedAt @db.Timestamptz(6)
+
+  based_on Activity?         @relation("ActivityVariants", fields: [based_on_id], references: [id], onDelete: SetNull)
+  variants Activity[]        @relation("ActivityVariants")
+  programs ProgramActivity[]
+  runs     RunActivity[]
+
+  @@index([based_on_id], map: "idx_activities_based_on_id")
+  @@map("activities")
+}
+
+// A program's usual activity plan, in order.
+model ProgramActivity {
+  id          Int @id @default(autoincrement())
+  program_id  Int
+  activity_id Int
+  sort_order  Int @default(0)
+
+  program  Program  @relation(fields: [program_id], references: [id], onDelete: Cascade)
+  activity Activity @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+
+  @@unique([program_id, activity_id])
+  @@map("program_activities")
+}
+
+// What one run actually did, in order, with how it was adapted this time. An activity
+// a run used cannot be deleted, so the history of past runs stays whole.
+model RunActivity {
+  id          Int     @id @default(autoincrement())
+  run_id      Int
+  activity_id Int
+  sort_order  Int     @default(0)
+  notes       String?
+
+  run      ProgramRun @relation(fields: [run_id], references: [id], onDelete: Cascade)
+  activity Activity   @relation(fields: [activity_id], references: [id], onDelete: Restrict)
+
+  @@index([run_id], map: "idx_run_activities_run_id")
+  @@map("run_activities")
 }
