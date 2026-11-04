@@ -103,6 +103,23 @@ tests/                     — unit tests (`npm test`)
 - **Admin permissions:** admin accounts can open the form configurator and delete partners; staff can manage partners and notes.
 - **Admin form configurator:** add/remove sections and fields, rename labels, toggle visibility, mark required (changes persist to localStorage in this prototype — wire to the `form_config` table for production).
 
+## Programs and activities
+
+- **Program** (`/programs`): something offered again and again, with its goals, ages and a usual activity plan.
+- **Run**: one stretch of a program, usually with a partner (e.g. Launchpad → 3D Geospatial Club →
+  2026–2027, or a one-day event). `/programs` groups runs by partner under Current and Past; marking a
+  run Completed or Cancelled moves it to Past. A partner's page lists its runs.
+- **Session**: one dated entry in a run, with the fields of the team's program doc (time, team arrival,
+  location, description, audience, development and facilitation team, equipment, document links, a
+  task checklist, misc notes). A new session starts with the program's usual activities and is filled in
+  from the run's latest session (date moved on a week, slides/notes/title left empty, tasks unticked);
+  its activities then change on their own, with a note per activity on how it was adapted.
+- **Activity library** (`/activities`): filter by age, goal, type or text. **Make a twist** copies an
+  activity into a new one linked back to it, so the original stays as it was.
+- **Suggestions**: when planning, activities are suggested from the audience's ages and the program's
+  goals (plain rules in `lib/programs.ts`, `suggestActivities`).
+- Anyone signed in can add and edit; only admins can delete. An activity a run used can't be deleted.
+
 ## Email notifications
 
 Emails go out through [Resend](https://resend.com):

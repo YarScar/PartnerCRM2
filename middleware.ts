@@ -19,7 +19,15 @@ function isProtectedPath(pathname: string) {
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/partners') ||
     pathname.startsWith('/admin') ||
-    pathname.startsWith('/api/partners')
+    pathname.startsWith('/api/partners') ||
+    pathname.startsWith('/programs') ||
+    pathname.startsWith('/runs') ||
+    pathname.startsWith('/activities') ||
+    pathname.startsWith('/api/programs') ||
+    pathname.startsWith('/api/runs') ||
+    pathname.startsWith('/api/activities') ||
+    pathname.startsWith('/sessions') ||
+    pathname.startsWith('/api/sessions')
   );
 }
 
