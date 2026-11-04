@@ -18,9 +18,9 @@ export default async function EditActivityPage({ params }: { params: Promise<{ i
     <div className="max-w-3xl mx-auto px-6 py-10">
       <BackLink href={`/activities/${activity.id}`} label={activity.name} />
       <PageHeading kicker="Edit activity" title={activity.name} />
-      {activity.runs.length > 0 && (
+      {activity.sessions.length > 0 && (
         <p className="text-sm text-ink/60 mb-4">
-          {activity.runs.length} run(s) used this. Editing changes it for them too. To change it for one new group only,
+          {activity.sessions.length} session(s) used this. Editing changes it for them too. To change it for one new group only,
           make a twist instead.
         </p>
       )}

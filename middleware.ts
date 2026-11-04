@@ -25,7 +25,9 @@ function isProtectedPath(pathname: string) {
     pathname.startsWith('/activities') ||
     pathname.startsWith('/api/programs') ||
     pathname.startsWith('/api/runs') ||
-    pathname.startsWith('/api/activities')
+    pathname.startsWith('/api/activities') ||
+    pathname.startsWith('/sessions') ||
+    pathname.startsWith('/api/sessions')
   );
 }
 

@@ -4,7 +4,7 @@ import { Edit2, GitBranch } from 'lucide-react';
 import { isAdmin } from '@/lib/auth';
 import { pageUser } from '@/lib/pageUser';
 import { parseId } from '@/lib/parseId';
-import { dateOnly } from '@/lib/programs';
+import { formatDate } from '@/lib/programs';
 import { getActivity } from '@/lib/programsData';
 import { DeleteButton } from '@/components/programs/DeleteButton';
 import { Ages, BackLink, Detail, EmptyState, Goals, PageHeading } from '@/components/programs/bits';
@@ -33,7 +33,7 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
               url={`/api/activities/${activity.id}`}
               after="/activities"
               what={activity.name}
-              warning={activity.runs.length ? 'A run used it, so it can’t be deleted. Edit it instead.' : undefined}
+              warning={activity.sessions.length ? 'A session used it, so it can’t be deleted. Edit it instead.' : undefined}
             />
           )}
         </PageHeading>
@@ -76,7 +76,7 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
 
         <section className="card space-y-3">
           <h2 className="font-display text-xl font-bold">Where it&apos;s used</h2>
-          {activity.programs.length === 0 && activity.runs.length === 0 ? (
+          {activity.programs.length === 0 && activity.sessions.length === 0 ? (
             <EmptyState>Not used yet.</EmptyState>
           ) : (
             <ul className="space-y-2 text-sm">
@@ -86,14 +86,16 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
                   <Link href={`/programs/${pa.program.id}`} className="font-medium hover:text-court">{pa.program.name}</Link>
                 </li>
               ))}
-              {activity.runs.map((ra) => (
-                <li key={`r${ra.id}`}>
-                  <Link href={`/runs/${ra.run.id}`} className="font-medium hover:text-court">{ra.run.name}</Link>
+              {activity.sessions.map((sa) => (
+                <li key={`s${sa.id}`}>
+                  <Link href={`/sessions/${sa.session.id}`} className="font-medium hover:text-court">
+                    {formatDate(sa.session.date)}{sa.session.title ? ` — ${sa.session.title}` : ''}
+                  </Link>
                   <span className="text-ink/50">
                     {' '}
-                    · {[ra.run.program.name, ra.run.partner?.org_name, dateOnly(ra.run.start_date)].filter(Boolean).join(' · ')}
+                    · {[sa.session.run.program.name, sa.session.run.name, sa.session.run.partner?.org_name].filter(Boolean).join(' · ')}
                   </span>
-                  {ra.notes && <div className="text-xs text-ink/60">Adapted: {ra.notes}</div>}
+                  {sa.notes && <div className="text-xs text-ink/60">Adapted: {sa.notes}</div>}
                 </li>
               ))}
             </ul>

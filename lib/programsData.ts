@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from './db';
-import type { ActivityData, ActivityListItem, ProgramData, RunData } from './programs';
+import type { ActivityData, ActivityListItem, ProgramData, RunData, SessionData } from './programs';
 
 /** All program, run and activity queries. Input is already checked by lib/programs.ts. */
 
@@ -36,7 +36,7 @@ export function getProgram(id: number) {
       activities: { orderBy: { sort_order: 'asc' }, include: { activity: { select: activityCard } } },
       runs: {
         orderBy: [{ start_date: 'desc' }, { id: 'desc' }],
-        include: { partner: { select: { id: true, org_name: true } }, _count: { select: { activities: true } } },
+        include: { partner: { select: { id: true, org_name: true } }, sessions: { orderBy: { date: 'asc' }, select: { date: true } } },
       },
     },
   });
@@ -55,7 +55,7 @@ export async function updateProgram(id: number, data: ProgramData) {
   }
 }
 
-/** Deletes the program and its runs (their activity lists go with them; the library stays). */
+/** Deletes the program with its runs and their sessions; the activity library stays. */
 export async function deleteProgram(id: number) {
   try {
     await prisma.program.delete({ where: { id } });
@@ -81,11 +81,24 @@ export async function setProgramActivities(programId: number, items: ActivityLis
 
 // ---------- Runs ----------
 
+const runListing = {
+  program: { select: { id: true, name: true } },
+  partner: { select: { id: true, org_name: true } },
+  sessions: { orderBy: { date: 'asc' as const }, select: { date: true } },
+} satisfies Prisma.ProgramRunInclude;
+
+export type RunListing = Prisma.ProgramRunGetPayload<{ include: typeof runListing }>;
+
+/** Every run with its program, partner and session dates, for the grouped Programs page. */
+export function listRuns() {
+  return prisma.programRun.findMany({ orderBy: [{ start_date: 'desc' }, { id: 'desc' }], include: runListing });
+}
+
 export function listRunsForPartner(partnerId: number) {
   return prisma.programRun.findMany({
     where: { partner_id: partnerId },
     orderBy: [{ start_date: 'desc' }, { id: 'desc' }],
-    include: { program: { select: { id: true, name: true } } },
+    include: runListing,
   });
 }
 
@@ -95,38 +108,29 @@ export function getRun(id: number) {
     include: {
       program: { select: { id: true, name: true, goals: true, age_min: true, age_max: true } },
       partner: { select: { id: true, org_name: true, youth_ages: true } },
-      activities: { orderBy: { sort_order: 'asc' }, include: { activity: { select: activityCard } } },
+      sessions: {
+        orderBy: [{ date: 'asc' }, { start_time: 'asc' }],
+        include: { activities: { orderBy: { sort_order: 'asc' }, include: { activity: { select: { id: true, name: true } } } } },
+      },
     },
   });
 }
 
-/**
- * Creates a run that starts from its program's usual activity plan, so each run only
- * records how it differed. Returns null if the program or partner doesn't exist.
- */
+/** Creates a run. Ages default to the program's until the run says otherwise. */
 export async function createRun(data: RunData) {
-  return prisma.$transaction(async (tx) => {
-    const program = await tx.program.findUnique({
-      where: { id: data.program_id! },
-      include: { activities: { orderBy: { sort_order: 'asc' } } },
-    });
-    if (!program) return { ok: false, error: 'Program not found' } as const;
-    if (data.partner_id && !(await tx.partner.findUnique({ where: { id: data.partner_id }, select: { id: true } }))) {
-      return { ok: false, error: 'Partner not found' } as const;
-    }
-    const run = await tx.programRun.create({
-      data: {
-        ...(data as Prisma.ProgramRunUncheckedCreateInput),
-        // Ages default to the program's until this run says otherwise.
-        age_min: data.age_min !== undefined ? data.age_min : program.age_min,
-        age_max: data.age_max !== undefined ? data.age_max : program.age_max,
-      },
-    });
-    await tx.runActivity.createMany({
-      data: program.activities.map((pa, i) => ({ run_id: run.id, activity_id: pa.activity_id, sort_order: i })),
-    });
-    return { ok: true, run } as const;
+  const program = await prisma.program.findUnique({ where: { id: data.program_id! } });
+  if (!program) return { ok: false, error: 'Program not found' } as const;
+  if (data.partner_id && !(await prisma.partner.findUnique({ where: { id: data.partner_id }, select: { id: true } }))) {
+    return { ok: false, error: 'Partner not found' } as const;
+  }
+  const run = await prisma.programRun.create({
+    data: {
+      ...(data as Prisma.ProgramRunUncheckedCreateInput),
+      age_min: data.age_min !== undefined ? data.age_min : program.age_min,
+      age_max: data.age_max !== undefined ? data.age_max : program.age_max,
+    },
   });
+  return { ok: true, run } as const;
 }
 
 export async function updateRun(id: number, data: RunData) {
@@ -141,6 +145,7 @@ export async function updateRun(id: number, data: RunData) {
   }
 }
 
+/** Deletes the run and its sessions. */
 export async function deleteRun(id: number) {
   try {
     await prisma.programRun.delete({ where: { id } });
@@ -151,17 +156,100 @@ export async function deleteRun(id: number) {
   }
 }
 
-/** Replaces what this run did with this ordered list, each with how it was adapted. */
-export async function setRunActivities(runId: number, items: ActivityListItem[]) {
+// ---------- Sessions ----------
+
+export function getSession(id: number) {
+  return prisma.programSession.findUnique({
+    where: { id },
+    include: {
+      run: {
+        select: {
+          id: true,
+          name: true,
+          age_min: true,
+          age_max: true,
+          program: { select: { id: true, name: true, goals: true } },
+          partner: { select: { id: true, org_name: true } },
+        },
+      },
+      activities: { orderBy: { sort_order: 'asc' }, include: { activity: { select: activityCard } } },
+    },
+  });
+}
+
+/** The run's latest session, used to prefill the next one. */
+export function previousSession(runId: number) {
+  return prisma.programSession.findFirst({ where: { run_id: runId }, orderBy: [{ date: 'desc' }, { id: 'desc' }] });
+}
+
+/**
+ * Creates a session. It starts with the program's usual activities, so the team only
+ * changes what is different this time.
+ */
+export async function createSession(data: SessionData) {
   return prisma.$transaction(async (tx) => {
-    if (!(await tx.programRun.findUnique({ where: { id: runId }, select: { id: true } }))) return 'not_found';
+    const run = await tx.programRun.findUnique({
+      where: { id: data.run_id! },
+      select: { program: { select: { activities: { orderBy: { sort_order: 'asc' }, select: { activity_id: true } } } } },
+    });
+    if (!run) return { ok: false, error: 'Run not found' } as const;
+    const session = await tx.programSession.create({
+      data: { ...(data as Prisma.ProgramSessionUncheckedCreateInput), tasks: (data.tasks ?? []) as Prisma.InputJsonValue },
+    });
+    await tx.sessionActivity.createMany({
+      data: run.program.activities.map((pa, i) => ({ session_id: session.id, activity_id: pa.activity_id, sort_order: i })),
+    });
+    return { ok: true, session } as const;
+  });
+}
+
+export async function updateSession(id: number, data: SessionData) {
+  try {
+    return await prisma.programSession.update({
+      where: { id },
+      data: { ...(data as Prisma.ProgramSessionUncheckedUpdateInput), tasks: data.tasks as Prisma.InputJsonValue | undefined },
+    });
+  } catch (e) {
+    if (isNotFound(e)) return null;
+    throw e;
+  }
+}
+
+/** Deletes a session; returns its run id, or null if it was already gone. */
+export async function deleteSession(id: number) {
+  try {
+    const s = await prisma.programSession.delete({ where: { id }, select: { run_id: true } });
+    return s.run_id;
+  } catch (e) {
+    if (isNotFound(e)) return null;
+    throw e;
+  }
+}
+
+/** Replaces what this session did with this ordered list, each with how it was adapted. */
+export async function setSessionActivities(sessionId: number, items: ActivityListItem[]) {
+  return prisma.$transaction(async (tx) => {
+    if (!(await tx.programSession.findUnique({ where: { id: sessionId }, select: { id: true } }))) return 'not_found';
     if (!(await allActivitiesExist(tx, items))) return 'unknown_activity';
-    await tx.runActivity.deleteMany({ where: { run_id: runId } });
-    await tx.runActivity.createMany({
-      data: items.map((it, i) => ({ run_id: runId, activity_id: it.activity_id, sort_order: i, notes: it.notes })),
+    await tx.sessionActivity.deleteMany({ where: { session_id: sessionId } });
+    await tx.sessionActivity.createMany({
+      data: items.map((it, i) => ({ session_id: sessionId, activity_id: it.activity_id, sort_order: i, notes: it.notes })),
     });
     return 'ok';
   });
+}
+
+/** Names already used on teams, plus account display names, for typing hints. */
+export async function teamNames() {
+  const [sessions, users] = await Promise.all([
+    prisma.programSession.findMany({ select: { development_team: true, facilitation_team: true }, take: 500, orderBy: { date: 'desc' } }),
+    prisma.user.findMany({ select: { display_name: true } }),
+  ]);
+  const names = new Map<string, string>();
+  for (const n of [...users.map((u) => u.display_name), ...sessions.flatMap((s) => [...s.development_team, ...s.facilitation_team])]) {
+    if (n && !names.has(n.toLowerCase())) names.set(n.toLowerCase(), n);
+  }
+  return [...names.values()].sort((a, b) => a.localeCompare(b));
 }
 
 // ---------- Activities ----------
@@ -191,7 +279,7 @@ export function listActivities(filter: ActivityFilter = {}) {
     select: {
       ...activityCard,
       based_on: { select: { id: true, name: true } },
-      _count: { select: { variants: true, runs: true } },
+      _count: { select: { variants: true, sessions: true } },
     },
   });
 }
@@ -225,16 +313,16 @@ export function getActivity(id: number) {
       based_on: { select: { id: true, name: true } },
       variants: { orderBy: { name: 'asc' }, select: { id: true, name: true, summary: true } },
       programs: { include: { program: { select: { id: true, name: true } } } },
-      runs: {
-        orderBy: { run: { start_date: 'desc' } },
+      sessions: {
+        orderBy: { session: { date: 'desc' } },
+        take: 100,
         include: {
-          run: {
+          session: {
             select: {
               id: true,
-              name: true,
-              start_date: true,
-              program: { select: { name: true } },
-              partner: { select: { org_name: true } },
+              date: true,
+              title: true,
+              run: { select: { name: true, program: { select: { name: true } }, partner: { select: { org_name: true } } } },
             },
           },
         },
@@ -260,11 +348,11 @@ export async function updateActivity(id: number, data: ActivityData) {
 }
 
 /**
- * Deletes an activity unless a run used it (that run's history would lose a step).
+ * Deletes an activity unless a session used it (that session's record would lose a step).
  * Its twists stay in the library; they just no longer point back to it.
  */
 export async function deleteActivity(id: number) {
-  const used = await prisma.runActivity.count({ where: { activity_id: id } });
+  const used = await prisma.sessionActivity.count({ where: { activity_id: id } });
   if (used > 0) return 'in_use' as const;
   try {
     await prisma.activity.delete({ where: { id } });

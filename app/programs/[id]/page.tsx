@@ -49,7 +49,7 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
             <h2 className="font-display text-2xl font-bold">Runs</h2>
-            <p className="text-sm text-ink/60">Each time this program happens, with who, and what was different.</p>
+            <p className="text-sm text-ink/60">Each stretch of this program (e.g. 2026–2027) with a partner, holding its sessions.</p>
           </div>
           <Link href={`/runs/new?program=${program.id}`} className="btn-primary">
             <Plus size={14} /> New run
@@ -64,7 +64,7 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
                 <div className="min-w-0">
                   <div className="font-semibold">{r.name}</div>
                   <div className="text-xs text-ink/50">
-                    {[r.partner?.org_name ?? 'No partner', r.start_date && dateOnly(r.start_date), `${r._count.activities} activities`]
+                    {[r.partner?.org_name ?? 'No partner', r.start_date && dateOnly(r.start_date), `${r.sessions.length} session${r.sessions.length === 1 ? '' : 's'}`]
                       .filter(Boolean)
                       .join(' · ')}
                   </div>
@@ -81,7 +81,7 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
         <div>
           <h2 className="font-display text-2xl font-bold">Usual activities</h2>
           <p className="text-sm text-ink/60">
-            The plan a new run starts with. Changing it here doesn&apos;t change runs that already exist.
+            The plan each new session starts with. Changing it here doesn&apos;t change sessions that already exist.
           </p>
         </div>
         <ActivityListEditor

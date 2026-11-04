@@ -158,8 +158,9 @@ model Program {
   @@map("programs")
 }
 
-// One time a program happened (or will). Starts with the program's activity plan,
-// then gets changed for this audience; what_changed records how it differed.
+// One stretch of a program, usually with a partner: e.g. "2026�2027" of 3D Geospatial Club
+// with Launchpad, or a one-day event. It holds the dated sessions. Completed or Cancelled
+// runs show under Past.
 model ProgramRun {
   id                Int       @id @default(autoincrement())
   program_id        Int
@@ -177,13 +178,46 @@ model ProgramRun {
   created_at        DateTime  @default(now()) @db.Timestamptz(6)
   updated_at        DateTime  @updatedAt @db.Timestamptz(6)
 
-  program    Program       @relation(fields: [program_id], references: [id], onDelete: Cascade)
-  partner    Partner?      @relation(fields: [partner_id], references: [id], onDelete: SetNull)
-  activities RunActivity[]
+  program  Program          @relation(fields: [program_id], references: [id], onDelete: Cascade)
+  partner  Partner?         @relation(fields: [partner_id], references: [id], onDelete: SetNull)
+  sessions ProgramSession[]
 
   @@index([program_id], map: "idx_program_runs_program_id")
   @@index([partner_id], map: "idx_program_runs_partner_id")
   @@map("program_runs")
+}
+
+// One dated session of a run: the fields of the team's program doc template.
+// Times are "HH:MM"; tasks is a checklist [{ text, done }].
+model ProgramSession {
+  id                Int      @id @default(autoincrement())
+  run_id            Int
+  date              DateTime @db.Date
+  title             String?
+  start_time        String?
+  end_time          String?
+  arrival_time      String?
+  location          String?
+  description       String?
+  creator_count     Int?
+  audience_notes    String?
+  development_team  String[] @default([])
+  facilitation_team String[] @default([])
+  equipment         String?
+  planning_doc_url  String?
+  slides_url        String?
+  shared_docs_url   String?
+  other_links       String?
+  tasks             Json?
+  notes             String?
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+
+  run        ProgramRun        @relation(fields: [run_id], references: [id], onDelete: Cascade)
+  activities SessionActivity[]
+
+  @@index([run_id, date], map: "idx_program_sessions_run_id_date")
+  @@map("program_sessions")
 }
 
 // The activity library. based_on_id links a twist back to the activity it came from.
@@ -206,7 +240,7 @@ model Activity {
   based_on Activity?         @relation("ActivityVariants", fields: [based_on_id], references: [id], onDelete: SetNull)
   variants Activity[]        @relation("ActivityVariants")
   programs ProgramActivity[]
-  runs     RunActivity[]
+  sessions SessionActivity[]
 
   @@index([based_on_id], map: "idx_activities_based_on_id")
   @@map("activities")
@@ -226,18 +260,18 @@ model ProgramActivity {
   @@map("program_activities")
 }
 
-// What one run actually did, in order, with how it was adapted this time. An activity
-// a run used cannot be deleted, so the history of past runs stays whole.
-model RunActivity {
+// What one session actually did, in order, with how each was adapted. An activity a
+// session used cannot be deleted, so past sessions stay whole.
+model SessionActivity {
   id          Int     @id @default(autoincrement())
-  run_id      Int
+  session_id  Int
   activity_id Int
   sort_order  Int     @default(0)
   notes       String?
 
-  run      ProgramRun @relation(fields: [run_id], references: [id], onDelete: Cascade)
-  activity Activity   @relation(fields: [activity_id], references: [id], onDelete: Restrict)
+  session  ProgramSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  activity Activity       @relation(fields: [activity_id], references: [id], onDelete: Restrict)
 
-  @@index([run_id], map: "idx_run_activities_run_id")
-  @@map("run_activities")
+  @@index([session_id], map: "idx_session_activities_session_id")
+  @@map("session_activities")
 }

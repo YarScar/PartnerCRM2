@@ -84,7 +84,7 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: P
               <div className="text-xs text-ink/50 flex flex-wrap gap-x-3">
                 <Ages min={a.age_min} max={a.age_max} />
                 {a.duration_minutes && <span>{a.duration_minutes} min</span>}
-                <span>Used in {a._count.runs} run{a._count.runs === 1 ? '' : 's'}</span>
+                <span>Used in {a._count.sessions} session{a._count.sessions === 1 ? '' : 's'}</span>
                 {a._count.variants > 0 && <span>{a._count.variants} twist{a._count.variants === 1 ? '' : 's'}</span>}
               </div>
             </Link>

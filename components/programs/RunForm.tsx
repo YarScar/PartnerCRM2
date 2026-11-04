@@ -80,7 +80,7 @@ export function RunForm({
       <div className="grid md:grid-cols-3 gap-4">
         <div className="md:col-span-2">
           <label className="label-base" htmlFor="name">Name for this run *</label>
-          <input id="name" className="input-base" required maxLength={200} value={v.name} onChange={(e) => set({ name: e.target.value })} placeholder="e.g. Spring 2027 at the YMCA" />
+          <input id="name" className="input-base" required maxLength={200} value={v.name} onChange={(e) => set({ name: e.target.value })} placeholder="e.g. 2026–2027, or 09/30 one-day event" />
         </div>
         <div>
           <label className="label-base" htmlFor="status">Status</label>
@@ -120,14 +120,14 @@ export function RunForm({
         <input id="count" type="number" min={0} className="input-base" value={v.participant_count} onChange={(e) => set({ participant_count: e.target.value })} />
       </div>
       <div>
-        <label className="label-base" htmlFor="what_changed">What was different this time</label>
+        <label className="label-base" htmlFor="what_changed">What’s different from last time</label>
         <textarea id="what_changed" className="input-base min-h-[100px]" value={v.what_changed} onChange={(e) => set({ what_changed: e.target.value })} placeholder="e.g. Shorter sessions, younger group, added a showcase at the end" />
       </div>
       <div>
         <label className="label-base" htmlFor="notes">Notes</label>
         <textarea id="notes" className="input-base min-h-[80px]" value={v.notes} onChange={(e) => set({ notes: e.target.value })} placeholder="How it went, what to do next time" />
       </div>
-      {!editing && <p className="text-xs text-ink/50">The run starts with the program’s usual activities. You can change them on the next page.</p>}
+      {!editing && <p className="text-xs text-ink/50">Add the dated sessions on the next page.</p>}
       {error && <div className="text-sm text-court">{error}</div>}
       <button className="btn-primary" disabled={saving}>
         <Save size={14} />
