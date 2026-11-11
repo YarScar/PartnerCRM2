@@ -9,7 +9,7 @@
     "seed": "tsx db/seed.ts"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "prisma generate && next dev",
     "postinstall": "prisma generate",
     "build": "next build",
     "start": "next start",
