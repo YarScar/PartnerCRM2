@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, FileEdit, Settings, LogOut, UserRound } from 'lucide-react';
+import { LayoutDashboard, Users, FileEdit, Settings, LogOut, UserRound, CalendarRange, Shapes } from 'lucide-react';
 import type { AuthUser } from '@/lib/auth';
 
 const links = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/partners', label: 'Partners', icon: Users },
+  { href: '/programs', label: 'Programs', icon: CalendarRange },
+  { href: '/activities', label: 'Activities', icon: Shapes },
   { href: '/intake', label: 'Intake Form', icon: FileEdit },
   // Account settings for everyone; admins also reach the form builders (/admin) from there.
   { href: '/settings', label: 'Settings', icon: Settings },
@@ -28,8 +30,7 @@ export function Nav({ user }: { user: AuthUser | null }) {
     <header className="border-b border-ink/10 bg-cream/80 backdrop-blur-md sticky top-0 z-20">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-full bg-ink flex items-center justify-center
-                          group-hover:bg-court transition-colors">
+          <div className="w-10 h-10 rounded-full bg-ink flex items-center justify-center group-hover:bg-court transition-colors">
             <span className="text-cream font-display font-bold text-lg">C</span>
           </div>
           <div>
@@ -47,12 +48,13 @@ export function Nav({ user }: { user: AuthUser | null }) {
                 const active =
                   pathname === href ||
                   pathname.startsWith(href + '/') ||
-                  (href === '/settings' && pathname.startsWith('/admin'));
+                  (href === '/settings' && pathname.startsWith('/admin')) ||
+                  (href === '/programs' && (pathname.startsWith('/runs') || pathname.startsWith('/sessions')));
                 return (
                   <Link
                     key={href}
                     href={href}
-                    className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 transition-all
+                    className={`px-3 py-2 rounded-full text-sm font-medium flex items-center gap-1.5 whitespace-nowrap transition-all
                       ${active
                         ? 'bg-ink text-cream'
                         : 'text-ink/70 hover:text-ink hover:bg-ink/5'}`}
@@ -63,7 +65,7 @@ export function Nav({ user }: { user: AuthUser | null }) {
                 );
                 })}
             </nav>
-            <div className="hidden sm:flex items-center gap-2 text-sm text-ink/60 border-l border-ink/10 pl-3">
+            <div className="hidden xl:flex items-center gap-2 text-sm whitespace-nowrap text-ink/60 border-l border-ink/10 pl-3">
               <UserRound size={15} />
               <span>{user.displayName}</span>
               <span className="text-ink/40 uppercase tracking-widest text-[10px]">{user.role}</span>

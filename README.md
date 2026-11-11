@@ -103,6 +103,42 @@ tests/                     — unit tests (`npm test`)
 - **Admin permissions:** admin accounts can open the form configurator and delete partners; staff can manage partners and notes.
 - **Admin form configurator:** add/remove sections and fields, rename labels, toggle visibility, mark required (changes persist to localStorage in this prototype — wire to the `form_config` table for production).
 
+## Programs and activities
+
+How it's organized: **Programs → partner (e.g. Launchpad) → their programs → sessions → debrief.**
+`/programs` shows one card per partner; a partner's page (`/programs/partners/[id]`, or `own` for
+programs with no partner) lists debriefs due, current programs, **Add program** (pick from the program
+library or name a new one) and the **Past programs** archive. "Move to past programs" on a program
+archives it (status Completed); "Reopen program" brings it back. Each session has a **debrief**
+(attendance, engagement 1–5, what went well, what to improve, changes for next time, highlights,
+follow-ups); a session on or before today without one shows as "Debrief due".
+
+**Jira tasks (read-only):** on a program's Edit page, set its Jira **epic key** (e.g. `CA-12`) or
+**label** (e.g. `geo-club-2026`). The program page lists those tasks (open first), and each session
+shows the open ones; every task links to Jira, where they're still edited. Needs `JIRA_BASE_URL`,
+`JIRA_EMAIL` and `JIRA_API_TOKEN` (see `.env.example`); without them the page links to the search in
+Jira instead. Results are cached for a minute.
+
+**Demo data** (test databases only): `npm run db:seed-programs-demo` adds Launchpad Philly with
+three past summers (Game Dev and 3D Design CAD tracks), last year's 3D Design and 3D Geospatial
+clubs, this year's clubs in progress, and the 4th summer planned. Re-running replaces it;
+`npm run db:seed-programs-demo -- --remove` takes it out. It refuses to run on Vercel or production.
+
+- **Program** (`/programs`): something offered again and again, with its goals, ages and a usual activity plan.
+- **Run**: one stretch of a program, usually with a partner (e.g. Launchpad → 3D Geospatial Club →
+  2026–2027, or a one-day event). `/programs` groups runs by partner under Current and Past; marking a
+  run Completed or Cancelled moves it to Past. A partner's page lists its runs.
+- **Session**: one dated entry in a run, with the fields of the team's program doc (time, team arrival,
+  location, description, audience, development and facilitation team, equipment, document links, a
+  task checklist, misc notes). A new session starts with the program's usual activities and is filled in
+  from the run's latest session (date moved on a week, slides/notes/title left empty, tasks unticked);
+  its activities then change on their own, with a note per activity on how it was adapted.
+- **Activity library** (`/activities`): filter by age, goal, type or text. **Make a twist** copies an
+  activity into a new one linked back to it, so the original stays as it was.
+- **Suggestions**: when planning, activities are suggested from the audience's ages and the program's
+  goals (plain rules in `lib/programs.ts`, `suggestActivities`).
+- Anyone signed in can add and edit; only admins can delete. An activity a run used can't be deleted.
+
 ## Email notifications
 
 Emails go out through [Resend](https://resend.com):

@@ -59,6 +59,7 @@ model Partner {
   updated_at                DateTime @updatedAt @db.Timestamptz(6)
 
   notes PartnerNote[]
+  runs  ProgramRun[]
 
   @@index([status], map: "idx_partners_status")
   @@index([created_at(sort: Desc)], map: "idx_partners_created_at")
@@ -136,4 +137,166 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@map("password_reset_tokens")
+}
+
+// A program is the reusable idea (e.g. "Intro to 3D Printing"). Each time it actually
+// happens is a ProgramRun, which can be with a partner and can differ from the plan.
+model Program {
+  id             Int      @id @default(autoincrement())
+  name           String
+  description    String?
+  goals          String[] @default([])
+  age_min        Int?
+  age_max        Int?
+  audience_notes String?
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @updatedAt @db.Timestamptz(6)
+
+  runs       ProgramRun[]
+  activities ProgramActivity[]
+
+  @@map("programs")
+}
+
+// One stretch of a program, usually with a partner: e.g. "2026�2027" of 3D Geospatial Club
+// with Launchpad, or a one-day event. It holds the dated sessions. Completed or Cancelled
+// runs show under Past.
+model ProgramRun {
+  id                Int       @id @default(autoincrement())
+  program_id        Int
+  partner_id        Int?
+  name              String
+  status            String    @default("Planned")
+  start_date        DateTime? @db.Date
+  end_date          DateTime? @db.Date
+  location          String?
+  age_min           Int?
+  age_max           Int?
+  participant_count Int?
+  what_changed      String?
+  notes             String?
+  // Read-only Jira link: the epic key (e.g. CA-12) or label its tasks are grouped by.
+  jira_epic         String?
+  jira_label        String?
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime  @updatedAt @db.Timestamptz(6)
+
+  program  Program          @relation(fields: [program_id], references: [id], onDelete: Cascade)
+  partner  Partner?         @relation(fields: [partner_id], references: [id], onDelete: SetNull)
+  sessions ProgramSession[]
+
+  @@index([program_id], map: "idx_program_runs_program_id")
+  @@index([partner_id], map: "idx_program_runs_partner_id")
+  @@map("program_runs")
+}
+
+// One dated session of a run: the fields of the team's program doc template.
+// Times are "HH:MM"; tasks is a checklist [{ text, done }].
+model ProgramSession {
+  id                Int      @id @default(autoincrement())
+  run_id            Int
+  date              DateTime @db.Date
+  title             String?
+  start_time        String?
+  end_time          String?
+  arrival_time      String?
+  location          String?
+  description       String?
+  creator_count     Int?
+  audience_notes    String?
+  development_team  String[] @default([])
+  facilitation_team String[] @default([])
+  equipment         String?
+  planning_doc_url  String?
+  slides_url        String?
+  shared_docs_url   String?
+  other_links       String?
+  tasks             Json?
+  notes             String?
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+
+  run        ProgramRun        @relation(fields: [run_id], references: [id], onDelete: Cascade)
+  activities SessionActivity[]
+  debrief    SessionDebrief?
+
+  @@index([run_id, date], map: "idx_program_sessions_run_id_date")
+  @@map("program_sessions")
+}
+
+// The activity library. based_on_id links a twist back to the activity it came from.
+model Activity {
+  id               Int      @id @default(autoincrement())
+  name             String
+  summary          String?
+  category         String?
+  goals            String[] @default([])
+  age_min          Int?
+  age_max          Int?
+  duration_minutes Int?
+  group_size       String?
+  materials        String?
+  instructions     String?
+  based_on_id      Int?
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @updatedAt @db.Timestamptz(6)
+
+  based_on Activity?         @relation("ActivityVariants", fields: [based_on_id], references: [id], onDelete: SetNull)
+  variants Activity[]        @relation("ActivityVariants")
+  programs ProgramActivity[]
+  sessions SessionActivity[]
+
+  @@index([based_on_id], map: "idx_activities_based_on_id")
+  @@map("activities")
+}
+
+// A program's usual activity plan, in order.
+model ProgramActivity {
+  id          Int @id @default(autoincrement())
+  program_id  Int
+  activity_id Int
+  sort_order  Int @default(0)
+
+  program  Program  @relation(fields: [program_id], references: [id], onDelete: Cascade)
+  activity Activity @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+
+  @@unique([program_id, activity_id])
+  @@map("program_activities")
+}
+
+// What one session actually did, in order, with how each was adapted. An activity a
+// session used cannot be deleted, so past sessions stay whole.
+model SessionActivity {
+  id          Int     @id @default(autoincrement())
+  session_id  Int
+  activity_id Int
+  sort_order  Int     @default(0)
+  notes       String?
+
+  session  ProgramSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  activity Activity       @relation(fields: [activity_id], references: [id], onDelete: Restrict)
+
+  @@index([session_id], map: "idx_session_activities_session_id")
+  @@map("session_activities")
+}
+
+// The after-session debrief (an after-action review): who came, how it went, what to
+// change next time and what needs following up. One per session, editable afterwards.
+model SessionDebrief {
+  id                Int      @id @default(autoincrement())
+  session_id        Int      @unique
+  attendance        Int?
+  engagement        Int?
+  went_well         String?
+  to_improve        String?
+  changes_next_time String?
+  highlights        String?
+  follow_ups        String?
+  submitted_by      String
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+
+  session ProgramSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
+
+  @@map("session_debriefs")
 }
