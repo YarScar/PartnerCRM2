@@ -15,15 +15,18 @@ function sessionSummary(sessions: RunListing['sessions']) {
   return next ? `${count} · next ${formatDate(next.date)}` : `${count} · last ${formatDate(last.date)}`;
 }
 
-/** One program with a partner: the program's name, its term, its sessions and debriefs due. */
-export function RunRow({ run }: { run: RunListing }) {
+/**
+ * One program with a partner: by default the program's name and its term; on a program's
+ * own page (`byPartner`) the partner's name instead, since the program is already known.
+ */
+export function RunRow({ run, byPartner = false }: { run: RunListing; byPartner?: boolean }) {
   // Past programs are archived for the record, so they don't nag for debriefs.
   const due = isPastRun(run.status) ? 0 : debriefsDue(run);
   return (
     <Link href={`/runs/${run.id}`} className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-court/5 transition-colors group">
       <div className="min-w-0">
         <div className="font-semibold group-hover:text-court transition-colors">
-          {run.program.name} <span className="font-normal text-ink/60">· {run.name}</span>
+          {byPartner ? run.partner?.org_name ?? 'Our own' : run.program.name} <span className="font-normal text-ink/60">· {run.name}</span>
         </div>
         <div className="text-xs text-ink/50">{sessionSummary(run.sessions)}</div>
       </div>

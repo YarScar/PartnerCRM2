@@ -25,7 +25,7 @@ export default async function NewRunPage({ searchParams }: { searchParams: Promi
           { label: 'Add program' },
         ]}
       />
-      <PageHeading kicker={chosen ? chosen.org_name : 'Programs'} title={chosen ? `Add a program with ${chosen.org_name}` : 'Add a program'} />
+      <PageHeading title={chosen ? `Add a program with ${chosen.org_name}` : 'Add a program'} />
       <RunForm
         programs={programs}
         partners={partners.map((p) => ({ id: p.id, name: p.org_name }))}

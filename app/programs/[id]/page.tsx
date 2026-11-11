@@ -4,94 +4,90 @@ import { Edit2, Plus } from 'lucide-react';
 import { isAdmin } from '@/lib/auth';
 import { pageUser } from '@/lib/pageUser';
 import { parseId } from '@/lib/parseId';
-import { dateOnly } from '@/lib/programs';
+import { formatAges, isPastRun } from '@/lib/programs';
 import { getProgram, listActivityCards } from '@/lib/programsData';
 import { ActivityListEditor } from '@/components/programs/ActivityListEditor';
 import { DeleteButton } from '@/components/programs/DeleteButton';
-import { Ages, BackLink, Detail, EmptyState, Goals, PageHeading, RunStatusBadge } from '@/components/programs/bits';
+import { RunRow } from '@/components/programs/RunRow';
+import { Breadcrumbs, EmptyState, Goals, PageHeading, Panel } from '@/components/programs/bits';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * A program in the library: what it is, where it has run (by partner), and the usual
+ * activities every new session starts with.
+ */
 export default async function ProgramPage({ params }: { params: Promise<{ id: string }> }) {
   const id = parseId((await params).id);
   const program = id ? await getProgram(id) : null;
   if (!program) notFound();
   const [library, user] = await Promise.all([listActivityCards(), pageUser()]);
+  const ages = formatAges(program.age_min, program.age_max);
+  const current = program.runs.filter((r) => !isPastRun(r.status));
+  const past = program.runs.filter((r) => isPastRun(r.status));
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
+    <div className="max-w-4xl mx-auto px-6 py-10 space-y-6">
       <div>
-        <BackLink href="/programs" label="Programs" />
-        <PageHeading kicker="Program" title={program.name}>
-          <Link href={`/programs/${program.id}/edit`} className="btn-secondary">
+        <Breadcrumbs items={[{ label: 'Programs', href: '/programs' }, { label: 'Program library', href: '/programs?view=library' }, { label: program.name }]} />
+        <PageHeading
+          title={program.name}
+          meta={
+            <>
+              <span>{ages ? `Ages ${ages}` : 'Any age'}</span>
+              <span>· Run {program.runs.length} time{program.runs.length === 1 ? '' : 's'}</span>
+            </>
+          }
+        >
+          <Link href={`/runs/new?program=${program.id}`} className="btn-primary">
+            <Plus size={14} /> Add to a partner
+          </Link>
+          <Link href={`/programs/${program.id}/edit`} className="btn-ghost">
             <Edit2 size={14} /> Edit
           </Link>
-          {isAdmin(user) && (
-            <DeleteButton
-              url={`/api/programs/${program.id}`}
-              after="/programs"
-              what={program.name}
-              warning={program.runs.length ? `Its ${program.runs.length} run(s) are deleted too. Activities stay in the library.` : undefined}
-            />
-          )}
         </PageHeading>
-        <div className="card space-y-4">
-          <Goals goals={program.goals} />
-          <div className="text-sm text-ink/70">
-            <Ages min={program.age_min} max={program.age_max} />
+        {(program.description || program.goals.length > 0 || program.audience_notes) && (
+          <div className="card space-y-3">
+            {program.description && <p className="text-sm whitespace-pre-wrap">{program.description}</p>}
+            {program.audience_notes && <p className="text-sm text-ink/60 whitespace-pre-wrap">{program.audience_notes}</p>}
+            <Goals goals={program.goals} />
           </div>
-          <Detail label="What it is">{program.description}</Detail>
-          <Detail label="Audience notes">{program.audience_notes}</Detail>
-        </div>
+        )}
       </div>
 
-      <section className="card space-y-4">
-        <div className="flex items-end justify-between gap-4 flex-wrap">
-          <div>
-            <h2 className="font-display text-2xl font-bold">Runs</h2>
-            <p className="text-sm text-ink/60">Each stretch of this program (e.g. 2026–2027) with a partner, holding its sessions.</p>
-          </div>
-          <Link href={`/runs/new?program=${program.id}`} className="btn-primary">
-            <Plus size={14} /> New run
-          </Link>
-        </div>
+      <Panel title="Where it runs" count={program.runs.length} flush>
         {program.runs.length === 0 ? (
-          <EmptyState>No runs yet.</EmptyState>
+          <EmptyState>Not run yet. Use Add to a partner to start it.</EmptyState>
         ) : (
-          <div className="divide-y divide-ink/10">
-            {program.runs.map((r) => (
-              <Link key={r.id} href={`/runs/${r.id}`} className="flex items-center justify-between gap-4 py-3 hover:text-court">
-                <div className="min-w-0">
-                  <div className="font-semibold">{r.name}</div>
-                  <div className="text-xs text-ink/50">
-                    {[r.partner?.org_name ?? 'No partner', r.start_date && dateOnly(r.start_date), `${r.sessions.length} session${r.sessions.length === 1 ? '' : 's'}`]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </div>
-                  {r.what_changed && <div className="text-xs text-ink/60 truncate">Different: {r.what_changed}</div>}
-                </div>
-                <RunStatusBadge status={r.status} />
-              </Link>
+          <div className="divide-y divide-ink/10 border-t border-ink/10">
+            {[...current, ...past].map((r) => (
+              <RunRow key={r.id} run={r} byPartner />
             ))}
           </div>
         )}
-      </section>
+      </Panel>
 
-      <section className="card space-y-4">
-        <div>
-          <h2 className="font-display text-2xl font-bold">Usual activities</h2>
-          <p className="text-sm text-ink/60">
-            The plan each new session starts with. Changing it here doesn&apos;t change sessions that already exist.
-          </p>
-        </div>
+      <Panel title="Usual activities" count={program.activities.length}>
+        <p className="text-sm text-ink/60 mb-4">Every new session starts with these. Changing them doesn&apos;t change sessions already planned.</p>
         <ActivityListEditor
           saveUrl={`/api/programs/${program.id}/activities`}
           initial={program.activities.map((pa) => ({ activity: pa.activity, notes: '' }))}
           library={library}
           target={{ age_min: program.age_min, age_max: program.age_max, goals: program.goals }}
-          emptyText="No usual activities yet. Add some below."
+          emptyText="No usual activities yet."
         />
-      </section>
+      </Panel>
+
+      {isAdmin(user) && (
+        <div className="pt-2 border-t border-ink/10">
+          <DeleteButton
+            url={`/api/programs/${program.id}`}
+            after="/programs?view=library"
+            what={program.name}
+            warning={program.runs.length ? `It has run ${program.runs.length} time(s); those runs and their sessions are deleted too. Activities stay in the library.` : undefined}
+          />
+        </div>
+      )}
     </div>
   );
 }

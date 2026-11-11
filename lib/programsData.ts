@@ -36,7 +36,7 @@ export function getProgram(id: number) {
       activities: { orderBy: { sort_order: 'asc' }, include: { activity: { select: activityCard } } },
       runs: {
         orderBy: [{ start_date: 'desc' }, { id: 'desc' }],
-        include: { partner: { select: { id: true, org_name: true } }, sessions: { orderBy: { date: 'asc' }, select: { date: true } } },
+        include: runListing,
       },
     },
   });

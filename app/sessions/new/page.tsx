@@ -4,7 +4,7 @@ import { formatAges, formatDate, todayDateOnly } from '@/lib/programs';
 import { getRun, previousSession, teamNames } from '@/lib/programsData';
 import { SessionForm } from '@/components/programs/SessionForm';
 import { newSessionForm } from '@/components/programs/sessionValues';
-import { BackLink, PageHeading } from '@/components/programs/bits';
+import { Breadcrumbs, PageHeading, partnerProgramsHref } from '@/components/programs/bits';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,8 +18,15 @@ export default async function NewSessionPage({ searchParams }: { searchParams: P
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-10">
-      <BackLink href={`/runs/${run.id}`} label={`${run.program.name} · ${run.name}`} />
-      <PageHeading kicker={`${run.program.name} · ${run.name}`} title="New session" />
+      <Breadcrumbs
+        items={[
+          { label: 'Programs', href: '/programs' },
+          { label: run.partner?.org_name ?? 'Our own programs', href: partnerProgramsHref(run.partner?.id) },
+          { label: `${run.program.name} · ${run.name}`, href: `/runs/${run.id}` },
+          { label: 'New session' },
+        ]}
+      />
+      <PageHeading title="New session" />
       <SessionForm
         knownNames={names}
         prefilledFrom={prev ? formatDate(prev.date) : undefined}

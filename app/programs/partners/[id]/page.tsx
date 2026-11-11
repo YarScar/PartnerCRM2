@@ -38,7 +38,7 @@ function CurrentProgram({ run, today }: { run: RunListing; today: string }) {
           {run.status === 'Planned' && <span className="ml-2 text-[11px] px-2 py-0.5 rounded-full bg-ink/10 align-middle">Planned</span>}
         </Link>
         <Link href={`/sessions/new?run=${run.id}`} className="btn-ghost shrink-0">
-          <Plus size={14} /> Session
+          <Plus size={14} /> New session
         </Link>
       </div>
       <SessionList sessions={shown} empty="No sessions yet. Add the first one." />
@@ -74,7 +74,7 @@ export default async function PartnerProgramsPage({ params }: { params: Promise<
     <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
       <div>
         <Breadcrumbs items={[{ label: 'Programs', href: '/programs' }, { label: name }]} />
-        <PageHeading kicker={partner ? 'Partner' : 'Programs with no partner'} title={name}>
+        <PageHeading title={name}>
           {partner && (
             <Link href={`/partners/${partner.id}`} className="btn-ghost">
               Partner profile

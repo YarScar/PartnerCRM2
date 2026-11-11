@@ -7,14 +7,45 @@
  *   npm run db:seed-programs-demo -- --remove   take it all out again
  *
  * Only for a test database: it refuses to run on Vercel or with NODE_ENV=production. Re-running
- * replaces the previous demo data; nothing that isn't demo data is touched. Demo rows are
- * recognized by DEMO_MARK in their notes/description/instructions, and the partner by
- * source "demo".
+ * replaces the previous demo data; nothing that isn't demo data is touched. Demo runs are
+ * recognized by their DEMO_NOTE, demo programs and activities by their exact name and
+ * description/summary (so nothing visible is added just to find them again), and the
+ * partner by source "demo".
  */
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-const DEMO_MARK = '[demo data]';
+const DEMO_NOTE = 'Demo data — safe to delete.';
+const LEGACY_MARK = '[demo data]';
+type ActivityDef = { name: string; category: string; summary: string; goals: string[]; age_min?: number; age_max?: number; duration_minutes: number; materials?: string };
+type ProgramDef = { name: string; description: string; goals: string[]; age_min: number; age_max: number };
+
+const ACTIVITY_DEFS = {
+  icebreaker: { name: 'Name + superpower circle', category: 'Icebreaker', summary: 'Say your name and the superpower you would 3D print.', goals: ['Community', 'Confidence'], duration_minutes: 10 },
+  gallery: { name: 'Gallery walk', category: 'Showcase', summary: 'Creators set up their work; everyone walks and leaves sticky-note feedback.', goals: ['Communication', 'Confidence'], duration_minutes: 30 },
+  familyShowcase: { name: 'Family showcase night', category: 'Showcase', summary: 'Gallery walk for families and Launchpad staff, with short creator talks.', goals: ['Communication', 'Confidence'], duration_minutes: 60 },
+  pitch: { name: 'Game idea pitch', category: 'Design challenge', summary: 'Teams pitch a one-sentence game idea and vote on what to build.', goals: ['Game design', 'Teamwork'], age_min: 12, age_max: 18, duration_minutes: 30 },
+  firstLevel: { name: 'First playable level', category: 'Hands-on build', summary: 'Build a moving character and one level in the game engine.', goals: ['Game design', 'Coding'], age_min: 12, age_max: 18, duration_minutes: 90, materials: 'Laptops with the game engine installed' },
+  paperLevels: { name: 'Paper level design', category: 'Design challenge', summary: 'Sketch levels on paper before building them.', goals: ['Game design', 'Problem solving'], age_min: 10, duration_minutes: 30, materials: 'Graph paper, markers' },
+  playtest: { name: 'Playtest & feedback circle', category: 'Reflection', summary: 'Swap games, play for five minutes, give one glow and one grow.', goals: ['Communication', 'Game design'], duration_minutes: 40 },
+  keychain: { name: 'Tinkercad keychain', category: 'Hands-on build', summary: 'Design a name keychain and send it to the printer.', goals: ['3D design', 'Confidence'], age_min: 9, duration_minutes: 45 },
+  clubKeychain: { name: 'Tinkercad keychain (club speed round)', category: 'Hands-on build', summary: 'The keychain in 20 minutes, as a warm-up for returning creators.', goals: ['3D design'], age_min: 12, duration_minutes: 20 },
+  phoneStand: { name: 'CAD phone stand', category: 'Hands-on build', summary: 'Measure a phone and model a stand that fits it in CAD.', goals: ['3D design', 'Engineering'], age_min: 13, duration_minutes: 90, materials: 'Calipers, laptops' },
+  printIterate: { name: 'Print, test, iterate', category: 'Hands-on build', summary: 'Print a part, test the fit, change one thing, print again.', goals: ['Engineering', 'Problem solving'], age_min: 12, duration_minutes: 60, materials: '3D printers, PLA' },
+  mapWalk: { name: 'Neighborhood map walk', category: 'Hands-on build', summary: 'Walk the block and mark landmarks to model later.', goals: ['3D mapping', 'Community'], age_min: 12, duration_minutes: 40 },
+  photogrammetry: { name: 'Photogrammetry capture', category: 'Hands-on build', summary: 'Photograph an object from every angle and turn it into a 3D model.', goals: ['3D mapping', '3D design'], age_min: 12, duration_minutes: 60, materials: 'Phones or tablets, turntable' },
+  modelBlock: { name: 'Model your block', category: 'Group project', summary: 'Teams model one street of the neighborhood for a shared map.', goals: ['3D mapping', 'Teamwork'], age_min: 13, duration_minutes: 90 },
+} satisfies Record<string, ActivityDef>;
+
+const PROGRAM_DEFS = {
+  gameDev: { name: 'Summer Program — Game Dev', ...{ description: 'Summer track: teams design, build and playtest their own game.', goals: ['Game design', 'Coding', 'Teamwork'], age_min: 13, age_max: 18 } },
+  cad: { name: 'Summer Program — 3D Design (CAD)', ...{ description: 'Summer track: from first Tinkercad model to a printed, tested design.', goals: ['3D design', 'Engineering', 'Confidence'], age_min: 13, age_max: 18 } },
+  designClub: { name: '3D Design Club', ...{ description: 'After-school club continuing CAD and 3D printing through the school year.', goals: ['3D design', 'Engineering', 'Community'], age_min: 13, age_max: 18 } },
+  geoClub: { name: '3D Geospatial Club', ...{ description: 'After-school club mapping and modeling the neighborhood in 3D.', goals: ['3D mapping', 'Teamwork', 'Community'], age_min: 13, age_max: 18 } },
+} satisfies Record<string, ProgramDef>;
+
+const DEMO_ACTIVITY_DEFS: ActivityDef[] = Object.values(ACTIVITY_DEFS);
+const DEMO_PROGRAM_DEFS: ProgramDef[] = Object.values(PROGRAM_DEFS);
 const PARTNER_NAME = 'Launchpad Philly';
 const TODAY = new Date();
 
@@ -28,11 +59,20 @@ const pick = (i: number, n: number) => Array.from({ length: n }, (_, k) => TEAM[
 
 async function removeDemo() {
   // Runs cascade to their sessions, session activities and debriefs.
-  const runs = await prisma.programRun.deleteMany({ where: { notes: { contains: DEMO_MARK } } });
+  // `contains` and LEGACY_MARK also catch demo data from before the marker was dropped.
+  const runs = await prisma.programRun.deleteMany({ where: { notes: { contains: DEMO_NOTE } } });
   const activities = await prisma.activity.deleteMany({
-    where: { instructions: { contains: DEMO_MARK }, sessions: { none: {} } },
+    where: {
+      OR: [...DEMO_ACTIVITY_DEFS.map((a) => ({ name: a.name, summary: a.summary })), { instructions: { contains: LEGACY_MARK } }],
+      sessions: { none: {} },
+    },
   });
-  const programs = await prisma.program.deleteMany({ where: { description: { contains: DEMO_MARK }, runs: { none: {} } } });
+  const programs = await prisma.program.deleteMany({
+    where: {
+      OR: [...DEMO_PROGRAM_DEFS.map((p) => ({ name: p.name, description: p.description })), { description: { contains: LEGACY_MARK } }],
+      runs: { none: {} },
+    },
+  });
   const partners = await prisma.partner.deleteMany({ where: { source: 'demo', runs: { none: {} } } });
   console.log(`Removed demo data: ${runs.count} runs, ${programs.count} programs, ${activities.count} activities, ${partners.count} partner.`);
 }
@@ -68,39 +108,39 @@ async function main() {
     }));
 
   // ---------- Activity library ----------
-  const act = (data: { name: string; category: string; summary: string; goals: string[]; age_min?: number; age_max?: number; duration_minutes: number; materials?: string; based_on_id?: number }) =>
-    prisma.activity.create({ data: { ...data, group_size: '12–24', instructions: `${data.summary}\n\n${DEMO_MARK}` } });
+  const act = (def: ActivityDef, based_on_id?: number) =>
+    prisma.activity.create({ data: { ...def, based_on_id, group_size: '12–24', instructions: def.summary } });
 
-  const icebreaker = await act({ name: 'Name + superpower circle', category: 'Icebreaker', summary: 'Say your name and the superpower you would 3D print.', goals: ['Community', 'Confidence'], duration_minutes: 10 });
-  const gallery = await act({ name: 'Gallery walk', category: 'Showcase', summary: 'Creators set up their work; everyone walks and leaves sticky-note feedback.', goals: ['Communication', 'Confidence'], duration_minutes: 30 });
-  const familyShowcase = await act({ name: 'Family showcase night', category: 'Showcase', summary: 'Gallery walk for families and Launchpad staff, with short creator talks.', goals: ['Communication', 'Confidence'], duration_minutes: 60, based_on_id: gallery.id });
-  const pitch = await act({ name: 'Game idea pitch', category: 'Design challenge', summary: 'Teams pitch a one-sentence game idea and vote on what to build.', goals: ['Game design', 'Teamwork'], age_min: 12, age_max: 18, duration_minutes: 30 });
-  const firstLevel = await act({ name: 'First playable level', category: 'Hands-on build', summary: 'Build a moving character and one level in the game engine.', goals: ['Game design', 'Coding'], age_min: 12, age_max: 18, duration_minutes: 90, materials: 'Laptops with the game engine installed' });
-  const paperLevels = await act({ name: 'Paper level design', category: 'Design challenge', summary: 'Sketch levels on paper before building them.', goals: ['Game design', 'Problem solving'], age_min: 10, duration_minutes: 30, materials: 'Graph paper, markers' });
-  const playtest = await act({ name: 'Playtest & feedback circle', category: 'Reflection', summary: 'Swap games, play for five minutes, give one glow and one grow.', goals: ['Communication', 'Game design'], duration_minutes: 40 });
-  const keychain = await act({ name: 'Tinkercad keychain', category: 'Hands-on build', summary: 'Design a name keychain and send it to the printer.', goals: ['3D design', 'Confidence'], age_min: 9, duration_minutes: 45 });
-  const clubKeychain = await act({ name: 'Tinkercad keychain (club speed round)', category: 'Hands-on build', summary: 'The keychain in 20 minutes, as a warm-up for returning creators.', goals: ['3D design'], age_min: 12, duration_minutes: 20, based_on_id: keychain.id });
-  const phoneStand = await act({ name: 'CAD phone stand', category: 'Hands-on build', summary: 'Measure a phone and model a stand that fits it in CAD.', goals: ['3D design', 'Engineering'], age_min: 13, duration_minutes: 90, materials: 'Calipers, laptops' });
-  const printIterate = await act({ name: 'Print, test, iterate', category: 'Hands-on build', summary: 'Print a part, test the fit, change one thing, print again.', goals: ['Engineering', 'Problem solving'], age_min: 12, duration_minutes: 60, materials: '3D printers, PLA' });
-  const mapWalk = await act({ name: 'Neighborhood map walk', category: 'Hands-on build', summary: 'Walk the block and mark landmarks to model later.', goals: ['3D mapping', 'Community'], age_min: 12, duration_minutes: 40 });
-  const photogrammetry = await act({ name: 'Photogrammetry capture', category: 'Hands-on build', summary: 'Photograph an object from every angle and turn it into a 3D model.', goals: ['3D mapping', '3D design'], age_min: 12, duration_minutes: 60, materials: 'Phones or tablets, turntable' });
-  const modelBlock = await act({ name: 'Model your block', category: 'Group project', summary: 'Teams model one street of the neighborhood for a shared map.', goals: ['3D mapping', 'Teamwork'], age_min: 13, duration_minutes: 90 });
+  const icebreaker = await act(ACTIVITY_DEFS.icebreaker);
+  const gallery = await act(ACTIVITY_DEFS.gallery);
+  const familyShowcase = await act(ACTIVITY_DEFS.familyShowcase, gallery.id);
+  const pitch = await act(ACTIVITY_DEFS.pitch);
+  const firstLevel = await act(ACTIVITY_DEFS.firstLevel);
+  const paperLevels = await act(ACTIVITY_DEFS.paperLevels);
+  const playtest = await act(ACTIVITY_DEFS.playtest);
+  const keychain = await act(ACTIVITY_DEFS.keychain);
+  const clubKeychain = await act(ACTIVITY_DEFS.clubKeychain, keychain.id);
+  const phoneStand = await act(ACTIVITY_DEFS.phoneStand);
+  const printIterate = await act(ACTIVITY_DEFS.printIterate);
+  const mapWalk = await act(ACTIVITY_DEFS.mapWalk);
+  const photogrammetry = await act(ACTIVITY_DEFS.photogrammetry);
+  const modelBlock = await act(ACTIVITY_DEFS.modelBlock);
 
   // ---------- Program library ----------
-  const program = async (name: string, data: { description: string; goals: string[]; age_min: number; age_max: number }, plan: { id: number }[]) => {
-    const existing = await prisma.program.findFirst({ where: { name } });
+  const program = async (def: ProgramDef, plan: { id: number }[]) => {
+    const existing = await prisma.program.findFirst({ where: { name: def.name } });
     const p =
       existing ??
-      (await prisma.program.create({ data: { name, ...data, description: `${data.description}\n\n${DEMO_MARK}` } }));
+      (await prisma.program.create({ data: def }));
     if (!existing) {
       await prisma.programActivity.createMany({ data: plan.map((a, i) => ({ program_id: p.id, activity_id: a.id, sort_order: i })) });
     }
     return p;
   };
-  const gameDev = await program('Summer Program — Game Dev', { description: 'Summer track: teams design, build and playtest their own game.', goals: ['Game design', 'Coding', 'Teamwork'], age_min: 13, age_max: 18 }, [icebreaker, pitch, firstLevel]);
-  const cad = await program('Summer Program — 3D Design (CAD)', { description: 'Summer track: from first Tinkercad model to a printed, tested design.', goals: ['3D design', 'Engineering', 'Confidence'], age_min: 13, age_max: 18 }, [icebreaker, keychain, phoneStand]);
-  const designClub = await program('3D Design Club', { description: 'After-school club continuing CAD and 3D printing through the school year.', goals: ['3D design', 'Engineering', 'Community'], age_min: 13, age_max: 18 }, [clubKeychain, printIterate]);
-  const geoClub = await program('3D Geospatial Club', { description: 'After-school club mapping and modeling the neighborhood in 3D.', goals: ['3D mapping', 'Teamwork', 'Community'], age_min: 13, age_max: 18 }, [mapWalk, photogrammetry]);
+  const gameDev = await program(PROGRAM_DEFS.gameDev, [icebreaker, pitch, firstLevel]);
+  const cad = await program(PROGRAM_DEFS.cad, [icebreaker, keychain, phoneStand]);
+  const designClub = await program(PROGRAM_DEFS.designClub, [clubKeychain, printIterate]);
+  const geoClub = await program(PROGRAM_DEFS.geoClub, [mapWalk, photogrammetry]);
 
   // ---------- Runs, sessions and debriefs ----------
   type SessionPlan = { date: Date; title: string; activities: { id: number }[]; adapted?: string };
@@ -132,7 +172,7 @@ async function main() {
         age_max: 18,
         participant_count: opts.creators,
         what_changed: opts.what_changed ?? null,
-        notes: `Demo data — safe to delete. ${DEMO_MARK}`,
+        notes: DEMO_NOTE,
         jira_epic: opts.jira_epic ?? null,
       },
     });

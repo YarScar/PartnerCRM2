@@ -54,14 +54,30 @@ export function partnerProgramsHref(partnerId: number | null | undefined) {
   return `/programs/partners/${partnerId ?? 'own'}`;
 }
 
-export function PageHeading({ kicker, title, children }: { kicker: string; title: string; children?: React.ReactNode }) {
+/**
+ * Every Programs/Activities page title: an optional small label above (only when it adds
+ * something the title doesn't say), the title, an optional facts line, and the page's
+ * actions on the right. One size everywhere so pages feel like one product.
+ */
+export function PageHeading({
+  kicker,
+  title,
+  meta,
+  children,
+}: {
+  kicker?: string;
+  title: React.ReactNode;
+  meta?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
   return (
-    <div className="flex items-end justify-between gap-4 flex-wrap mb-8">
-      <div>
-        <div className="text-xs uppercase tracking-widest text-ink/50 mb-2">{kicker}</div>
-        <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight">{title}</h1>
+    <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
+      <div className="min-w-0">
+        {kicker && <div className="text-xs uppercase tracking-widest text-ink/50 mb-1.5">{kicker}</div>}
+        <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight">{title}</h1>
+        {meta && <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink/60">{meta}</div>}
       </div>
-      {children && <div className="flex flex-wrap gap-2">{children}</div>}
+      {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </div>
   );
 }
@@ -93,4 +109,52 @@ export function RunStatusBadge({ status }: { status: string }) {
 
 export function EmptyState({ children }: { children: React.ReactNode }) {
   return <div className="text-sm text-ink/50 py-6 text-center">{children}</div>;
+}
+
+/** Underlined section tabs, as links (each tab has its own URL, so back/forward and sharing work). */
+export function Tabs({ tabs, label }: { tabs: { href: string; label: React.ReactNode; active: boolean }[]; label: string }) {
+  return (
+    <nav className="flex gap-1 border-b border-ink/10 mb-6 overflow-x-auto" aria-label={label}>
+      {tabs.map((t) => (
+        <Link
+          key={t.href}
+          href={t.href}
+          aria-current={t.active ? 'page' : undefined}
+          className={`px-4 py-2.5 text-sm font-medium -mb-px border-b-2 whitespace-nowrap ${t.active ? 'border-ink text-ink' : 'border-transparent text-ink/60 hover:text-ink'}`}
+        >
+          {t.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+/** A titled white panel; `flush` for lists that run edge to edge. */
+export function Panel({
+  title,
+  count,
+  action,
+  flush = false,
+  children,
+}: {
+  title?: React.ReactNode;
+  count?: number;
+  action?: React.ReactNode;
+  flush?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={`card overflow-hidden ${flush ? '!p-0' : ''}`}>
+      {title && (
+        <div className={`flex items-center justify-between gap-3 ${flush ? 'px-5 pt-4 pb-2' : 'mb-3'}`}>
+          <h2 className="font-display text-lg font-bold">
+            {title}
+            {count != null && <span className="ml-1.5 text-sm font-normal text-ink/50">{count}</span>}
+          </h2>
+          {action}
+        </div>
+      )}
+      {children}
+    </section>
+  );
 }

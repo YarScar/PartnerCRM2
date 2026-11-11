@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { parseId } from '@/lib/parseId';
 import { activityVocabulary, getProgram } from '@/lib/programsData';
 import { ProgramForm } from '@/components/programs/ProgramForm';
-import { BackLink, PageHeading } from '@/components/programs/bits';
+import { Breadcrumbs, PageHeading } from '@/components/programs/bits';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,8 +14,8 @@ export default async function EditProgramPage({ params }: { params: Promise<{ id
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-10">
-      <BackLink href={`/programs/${program.id}`} label={program.name} />
-      <PageHeading kicker="Edit program" title={program.name} />
+      <Breadcrumbs items={[{ label: 'Programs', href: '/programs' }, { label: 'Program library', href: '/programs?view=library' }, { label: program.name, href: `/programs/${program.id}` }, { label: 'Edit' }]} />
+      <PageHeading title={`Edit ${program.name}`} />
       <ProgramForm
         knownGoals={goals}
         initial={{

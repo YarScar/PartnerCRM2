@@ -15,7 +15,7 @@ import { JiraTasks, JiraTasksLoading } from '@/components/programs/JiraTasks';
 import { DebriefChip } from '@/components/programs/SessionList';
 import { TaskListEditor } from '@/components/programs/TaskListEditor';
 import { storedTasks } from '@/components/programs/sessionValues';
-import { Breadcrumbs, partnerProgramsHref } from '@/components/programs/bits';
+import { Breadcrumbs, PageHeading, Tabs, partnerProgramsHref } from '@/components/programs/bits';
 
 export const dynamic = 'force-dynamic';
 
@@ -106,21 +106,23 @@ export default async function SessionPage({
             { label: `${run.program.name} · ${run.name}`, href: `/runs/${run.id}` },
           ]}
         />
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <div className="text-xs uppercase tracking-widest text-ink/50 mb-1">Session {at + 1} of {siblings.length}</div>
-            <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight">
+        <PageHeading
+          kicker={`Session ${at + 1} of ${siblings.length}`}
+          title={
+            <>
               {formatDate(session.date)}
               {session.title && <span className="text-ink/50 font-normal"> · {session.title}</span>}
-            </h1>
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink/60">
+            </>
+          }
+          meta={
+            <>
               <DebriefChip date={session.date} done={Boolean(session.debrief)} />
               {time && <span>{time}</span>}
               {session.arrival_time && <span>· team arrives {formatTime(session.arrival_time)}</span>}
               {session.location && <span>· {session.location}</span>}
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
+            </>
+          }
+        >
             {prev && (
               <Link href={`/sessions/${prev.id}`} className="btn-ghost !px-2" aria-label="Previous session" title={formatDate(prev.date)}>
                 <ChevronLeft size={16} />
@@ -134,24 +136,23 @@ export default async function SessionPage({
             <Link href={`/sessions/${session.id}/edit`} className="btn-secondary">
               <Edit2 size={14} /> Edit
             </Link>
-          </div>
-        </div>
+        </PageHeading>
       </div>
 
-      <nav className="flex gap-1 border-b border-ink/10" aria-label="Session sections">
-        {TABS.map((t) => (
-          <Link
-            key={t}
-            href={`/sessions/${session.id}?tab=${t}`}
-            aria-current={tab === t ? 'page' : undefined}
-            className={`px-4 py-2.5 text-sm font-medium -mb-px border-b-2 ${tab === t ? 'border-ink text-ink' : 'border-transparent text-ink/60 hover:text-ink'}`}
-          >
-            {t === 'overview' ? 'Overview' : t === 'debrief' ? 'Debrief' : 'Activities'}
-            {t === 'debrief' && status === 'due' && <span className="ml-1.5 inline-block w-2 h-2 rounded-full bg-court align-middle" />}
-            {t === 'activities' && <span className="ml-1.5 text-ink/40">{session.activities.length}</span>}
-          </Link>
-        ))}
-      </nav>
+      <Tabs
+        label="Session sections"
+        tabs={TABS.map((t) => ({
+          href: `/sessions/${session.id}?tab=${t}`,
+          active: tab === t,
+          label: (
+            <>
+              {t === 'overview' ? 'Overview' : t === 'debrief' ? 'Debrief' : 'Activities'}
+              {t === 'debrief' && status === 'due' && <span className="ml-1.5 inline-block w-2 h-2 rounded-full bg-court align-middle" aria-label="due" />}
+              {t === 'activities' && <span className="ml-1.5 text-ink/40">{session.activities.length}</span>}
+            </>
+          ),
+        }))}
+      />
 
       {tab === 'overview' && (
         <div className="grid md:grid-cols-[1fr_17rem] gap-6 items-start">

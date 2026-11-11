@@ -170,10 +170,15 @@ export function RunForm({
       </fieldset>
       {!editing && <p className="text-xs text-ink/50">Add the dated sessions on the next page.</p>}
       {error && <div className="text-sm text-court">{error}</div>}
-      <button className="btn-primary" disabled={saving}>
-        <Save size={14} />
-        {saving ? 'Saving...' : editing ? 'Save changes' : 'Add program'}
-      </button>
+      <div className="flex items-center gap-2">
+        <button className="btn-primary" disabled={saving}>
+          <Save size={14} />
+          {saving ? 'Saving...' : editing ? 'Save changes' : 'Add program'}
+        </button>
+        <button type="button" className="btn-ghost" onClick={() => history.back()} disabled={saving}>
+          Cancel
+        </button>
+      </div>
     </form>
   );
 }

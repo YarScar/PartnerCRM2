@@ -11,7 +11,7 @@ import { ArchiveRunButton } from '@/components/programs/ArchiveRunButton';
 import { DeleteButton } from '@/components/programs/DeleteButton';
 import { JiraTasks, JiraTasksLoading } from '@/components/programs/JiraTasks';
 import { SessionList } from '@/components/programs/SessionList';
-import { Breadcrumbs, Goals, RunStatusBadge, partnerProgramsHref } from '@/components/programs/bits';
+import { Breadcrumbs, Goals, PageHeading, Panel, RunStatusBadge, partnerProgramsHref } from '@/components/programs/bits';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,46 +36,43 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
             { label: `${run.program.name} · ${run.name}` },
           ]}
         />
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight">{run.program.name}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink/60">
+        <PageHeading
+          title={run.program.name}
+          meta={
+            <>
               <span className="font-medium text-ink">{run.name}</span>
               <RunStatusBadge status={run.status} />
               {facts.map((f) => (
                 <span key={String(f)}>· {f}</span>
               ))}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-1">
-            <Link href={`/sessions/new?run=${run.id}`} className="btn-primary">
-              <Plus size={14} /> Session
-            </Link>
-            <Link href={`/runs/${run.id}/edit`} className="btn-ghost" aria-label="Edit program details">
-              <Edit2 size={14} /> Edit
-            </Link>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <Link href={`/sessions/new?run=${run.id}`} className="btn-primary">
+            <Plus size={14} /> New session
+          </Link>
+          <Link href={`/runs/${run.id}/edit`} className="btn-ghost" aria-label="Edit program details">
+            <Edit2 size={14} /> Edit
+          </Link>
+        </PageHeading>
       </div>
 
-      <section className="card !p-0 overflow-hidden">
-        <h2 className="px-5 pt-4 pb-2 font-display text-lg font-bold">
-          Sessions <span className="text-sm font-normal text-ink/50">{run.sessions.length}</span>
-        </h2>
+      <Panel title="Sessions" count={run.sessions.length} flush>
         <SessionList sessions={run.sessions} empty="No sessions yet. Add the first one." />
-      </section>
+      </Panel>
 
-      <section className="card space-y-3">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-display text-lg font-bold">Jira tasks</h2>
-          {(run.jira_epic || run.jira_label) && (
+      <Panel
+        title="Jira tasks"
+        action={
+          (run.jira_epic || run.jira_label) && (
             <span className="text-xs text-ink/50">{[run.jira_epic && `Epic ${run.jira_epic}`, run.jira_label && `Label ${run.jira_label}`].filter(Boolean).join(' · ')}</span>
-          )}
-        </div>
+          )
+        }
+      >
         <Suspense fallback={<JiraTasksLoading />}>
           <JiraTasks link={run} editHref={`/runs/${run.id}/edit`} />
         </Suspense>
-      </section>
+      </Panel>
 
       {hasDetails && (
         <details className="card">

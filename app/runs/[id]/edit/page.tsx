@@ -4,7 +4,7 @@ import { parseId } from '@/lib/parseId';
 import { dateOnly } from '@/lib/programs';
 import { getRun } from '@/lib/programsData';
 import { RunForm } from '@/components/programs/RunForm';
-import { BackLink, PageHeading } from '@/components/programs/bits';
+import { Breadcrumbs, PageHeading, partnerProgramsHref } from '@/components/programs/bits';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,8 +17,15 @@ export default async function EditRunPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-10">
-      <BackLink href={`/runs/${run.id}`} label={run.name} />
-      <PageHeading kicker="Edit run" title={run.name} />
+      <Breadcrumbs
+        items={[
+          { label: 'Programs', href: '/programs' },
+          { label: run.partner?.org_name ?? 'Our own programs', href: partnerProgramsHref(run.partner?.id) },
+          { label: `${run.program.name} · ${run.name}`, href: `/runs/${run.id}` },
+          { label: 'Edit' },
+        ]}
+      />
+      <PageHeading title={`Edit ${run.program.name} · ${run.name}`} />
       <RunForm
         programs={[{ id: run.program.id, name: run.program.name }]}
         partners={partners.map((p) => ({ id: p.id, name: p.org_name }))}

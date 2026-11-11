@@ -4,104 +4,135 @@ import { Edit2, GitBranch } from 'lucide-react';
 import { isAdmin } from '@/lib/auth';
 import { pageUser } from '@/lib/pageUser';
 import { parseId } from '@/lib/parseId';
-import { formatDate } from '@/lib/programs';
+import { formatAges } from '@/lib/programs';
 import { getActivity } from '@/lib/programsData';
 import { DeleteButton } from '@/components/programs/DeleteButton';
-import { Ages, BackLink, Detail, EmptyState, Goals, PageHeading } from '@/components/programs/bits';
+import { Breadcrumbs, Goals, PageHeading, Panel } from '@/components/programs/bits';
 
 export const dynamic = 'force-dynamic';
 
+const RECENT_USES = 5;
+const shortDate = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+
+/** One activity: how to run it first, then its twists and where it has been used. */
 export default async function ActivityPage({ params }: { params: Promise<{ id: string }> }) {
   const id = parseId((await params).id);
   const activity = id ? await getActivity(id) : null;
   if (!activity) notFound();
   const user = await pageUser();
+  const ages = formatAges(activity.age_min, activity.age_max);
+  const recent = activity.sessions.slice(0, RECENT_USES);
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
+    <div className="max-w-4xl mx-auto px-6 py-10 space-y-6">
       <div>
-        <BackLink href="/activities" label="Activity library" />
-        <PageHeading kicker={activity.category || 'Activity'} title={activity.name}>
-          <Link href={`/activities/new?based_on=${activity.id}`} className="btn-primary">
-            <GitBranch size={14} /> Make a twist
-          </Link>
+        <Breadcrumbs items={[{ label: 'Activities', href: '/activities' }, { label: activity.name }]} />
+        <PageHeading
+          title={activity.name}
+          meta={
+            <>
+              {activity.category && <span className="px-2 py-0.5 rounded-full bg-ink/5 text-xs">{activity.category}</span>}
+              <span>{ages ? `Ages ${ages}` : 'Any age'}</span>
+              {activity.duration_minutes && <span>· {activity.duration_minutes} min</span>}
+              {activity.group_size && <span>· {activity.group_size}</span>}
+              {activity.based_on && (
+                <span className="inline-flex items-center gap-1">
+                  · <GitBranch size={13} /> Twist of{' '}
+                  <Link href={`/activities/${activity.based_on.id}`} className="underline hover:text-court">{activity.based_on.name}</Link>
+                </span>
+              )}
+            </>
+          }
+        >
           <Link href={`/activities/${activity.id}/edit`} className="btn-secondary">
             <Edit2 size={14} /> Edit
           </Link>
-          {isAdmin(user) && (
-            <DeleteButton
-              url={`/api/activities/${activity.id}`}
-              after="/activities"
-              what={activity.name}
-              warning={activity.sessions.length ? 'A session used it, so it can’t be deleted. Edit it instead.' : undefined}
-            />
-          )}
+          <Link href={`/activities/new?based_on=${activity.id}`} className="btn-ghost" title="Copy it into a new activity you can change, keeping this one as it is">
+            <GitBranch size={14} /> Make a twist
+          </Link>
         </PageHeading>
+      </div>
 
-        <div className="card space-y-4">
-          {activity.based_on && (
-            <div className="text-sm flex items-center gap-1.5 text-ink/70">
-              <GitBranch size={14} /> Twist of{' '}
-              <Link href={`/activities/${activity.based_on.id}`} className="underline hover:text-court">{activity.based_on.name}</Link>
-            </div>
-          )}
-          {activity.summary && <p className="text-lg">{activity.summary}</p>}
-          <Goals goals={activity.goals} />
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink/70">
-            <Ages min={activity.age_min} max={activity.age_max} />
-            {activity.duration_minutes && <span>{activity.duration_minutes} minutes</span>}
-            {activity.group_size && <span>Group: {activity.group_size}</span>}
+      <section className="card space-y-5">
+        {activity.summary && <p className="text-base">{activity.summary}</p>}
+        <Goals goals={activity.goals} />
+        {activity.materials && (
+          <div>
+            <div className="label-base">Materials</div>
+            <p className="text-sm whitespace-pre-wrap">{activity.materials}</p>
           </div>
-          <Detail label="Materials">{activity.materials}</Detail>
-          <Detail label="How to run it">{activity.instructions}</Detail>
-        </div>
-      </div>
+        )}
+        {activity.instructions && (
+          <div>
+            <div className="label-base">How to run it</div>
+            <p className="text-sm whitespace-pre-wrap">{activity.instructions}</p>
+          </div>
+        )}
+        {!activity.summary && !activity.materials && !activity.instructions && (
+          <p className="text-sm text-ink/50">
+            No details yet. <Link href={`/activities/${activity.id}/edit`} className="underline">Add how to run it</Link>
+          </p>
+        )}
+      </section>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <section className="card space-y-3">
-          <h2 className="font-display text-xl font-bold">Twists of this activity</h2>
-          {activity.variants.length === 0 ? (
-            <EmptyState>None yet.</EmptyState>
-          ) : (
-            <ul className="space-y-2">
-              {activity.variants.map((v) => (
-                <li key={v.id}>
-                  <Link href={`/activities/${v.id}`} className="font-medium hover:text-court">{v.name}</Link>
-                  {v.summary && <div className="text-xs text-ink/50">{v.summary}</div>}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+      {activity.variants.length > 0 && (
+        <Panel title="Twists" count={activity.variants.length} flush>
+          <ul className="divide-y divide-ink/10 border-t border-ink/10">
+            {activity.variants.map((v) => (
+              <li key={v.id}>
+                <Link href={`/activities/${v.id}`} className="block px-5 py-2.5 hover:bg-court/5">
+                  <span className="text-sm font-medium">{v.name}</span>
+                  {v.summary && <span className="block text-xs text-ink/50 truncate">{v.summary}</span>}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
 
-        <section className="card space-y-3">
-          <h2 className="font-display text-xl font-bold">Where it&apos;s used</h2>
-          {activity.programs.length === 0 && activity.sessions.length === 0 ? (
-            <EmptyState>Not used yet.</EmptyState>
-          ) : (
-            <ul className="space-y-2 text-sm">
-              {activity.programs.map((pa) => (
-                <li key={`p${pa.id}`}>
-                  Usual plan of{' '}
-                  <Link href={`/programs/${pa.program.id}`} className="font-medium hover:text-court">{pa.program.name}</Link>
-                </li>
-              ))}
-              {activity.sessions.map((sa) => (
-                <li key={`s${sa.id}`}>
-                  <Link href={`/sessions/${sa.session.id}`} className="font-medium hover:text-court">
-                    {formatDate(sa.session.date)}{sa.session.title ? ` — ${sa.session.title}` : ''}
-                  </Link>
-                  <span className="text-ink/50">
-                    {' '}
-                    · {[sa.session.run.program.name, sa.session.run.name, sa.session.run.partner?.org_name].filter(Boolean).join(' · ')}
+      <Panel title="Used in" count={activity.sessions.length} flush>
+        {activity.programs.length > 0 && (
+          <div className="px-5 pb-3 flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-ink/50">Usual plan of</span>
+            {activity.programs.map((pa) => (
+              <Link key={pa.id} href={`/programs/${pa.program.id}`} className="px-2 py-0.5 rounded-full bg-ink/5 hover:bg-court/10 hover:text-court">
+                {pa.program.name}
+              </Link>
+            ))}
+          </div>
+        )}
+        {recent.length === 0 ? (
+          <p className="px-5 pb-4 text-sm text-ink/50">Not used in a session yet.</p>
+        ) : (
+          <ul className="divide-y divide-ink/10 border-t border-ink/10">
+            {recent.map((sa) => (
+              <li key={sa.id}>
+                <Link href={`/sessions/${sa.session.id}?tab=activities`} className="block px-5 py-2.5 hover:bg-court/5">
+                  <span className="text-sm">
+                    <span className="font-medium">{shortDate(sa.session.date)}</span>
+                    <span className="text-ink/50"> · {[sa.session.run.partner?.org_name, sa.session.run.program.name, sa.session.run.name].filter(Boolean).join(' · ')}</span>
                   </span>
-                  {sa.notes && <div className="text-xs text-ink/60">Adapted: {sa.notes}</div>}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
+                  {sa.notes && <span className="block text-xs text-ink/60">Adapted: {sa.notes}</span>}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        {activity.sessions.length > RECENT_USES && (
+          <p className="px-5 py-2.5 text-xs text-ink/50 border-t border-ink/10">Showing the {RECENT_USES} most recent of {activity.sessions.length}.</p>
+        )}
+      </Panel>
+
+      {isAdmin(user) && (
+        <div className="pt-2 border-t border-ink/10">
+          <DeleteButton
+            url={`/api/activities/${activity.id}`}
+            after="/activities"
+            what={activity.name}
+            warning={activity.sessions.length ? 'A session used it, so it can’t be deleted. Edit it instead.' : undefined}
+          />
+        </div>
+      )}
     </div>
   );
 }

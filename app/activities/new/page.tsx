@@ -2,7 +2,7 @@ import { parseId } from '@/lib/parseId';
 import { categoryChoices } from '@/lib/programs';
 import { activityVocabulary, getActivity } from '@/lib/programsData';
 import { ActivityForm, EMPTY_ACTIVITY, type ActivityFormValues } from '@/components/programs/ActivityForm';
-import { BackLink, PageHeading } from '@/components/programs/bits';
+import { Breadcrumbs, PageHeading } from '@/components/programs/bits';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,8 +31,14 @@ export default async function NewActivityPage({ searchParams }: { searchParams: 
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-10">
-      <BackLink href={original ? `/activities/${original.id}` : '/activities'} label={original ? original.name : 'Activity library'} />
-      <PageHeading kicker={original ? 'Make a twist' : '+ New activity'} title={original ? 'New twist' : 'New activity'} />
+      <Breadcrumbs
+        items={[
+          { label: 'Activities', href: '/activities' },
+          ...(original ? [{ label: original.name, href: `/activities/${original.id}` }] : []),
+          { label: original ? 'New twist' : 'New activity' },
+        ]}
+      />
+      <PageHeading title={original ? `New twist of ${original.name}` : 'New activity'} />
       <ActivityForm initial={initial} basedOnName={original?.name} knownGoals={vocab.goals} categories={categoryChoices(vocab.categories)} />
     </div>
   );

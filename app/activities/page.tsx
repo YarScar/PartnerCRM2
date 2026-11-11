@@ -30,7 +30,7 @@ export default async function ActivitiesPage({ searchParams }: { searchParams: P
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-10">
-      <PageHeading kicker="Activities" title="Activity library">
+      <PageHeading title="Activities">
         <Link href="/activities/new" className="btn-primary">
           <Plus size={16} /> New activity
         </Link>

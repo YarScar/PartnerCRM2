@@ -3,7 +3,7 @@ import { parseId } from '@/lib/parseId';
 import { categoryChoices } from '@/lib/programs';
 import { activityVocabulary, getActivity } from '@/lib/programsData';
 import { ActivityForm } from '@/components/programs/ActivityForm';
-import { BackLink, PageHeading } from '@/components/programs/bits';
+import { Breadcrumbs, PageHeading } from '@/components/programs/bits';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,8 +16,8 @@ export default async function EditActivityPage({ params }: { params: Promise<{ i
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-10">
-      <BackLink href={`/activities/${activity.id}`} label={activity.name} />
-      <PageHeading kicker="Edit activity" title={activity.name} />
+      <Breadcrumbs items={[{ label: 'Activities', href: '/activities' }, { label: activity.name, href: `/activities/${activity.id}` }, { label: 'Edit' }]} />
+      <PageHeading title={`Edit ${activity.name}`} />
       {activity.sessions.length > 0 && (
         <p className="text-sm text-ink/60 mb-4">
           {activity.sessions.length} session(s) used this. Editing changes it for them too. To change it for one new group only,

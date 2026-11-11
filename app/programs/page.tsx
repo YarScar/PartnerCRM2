@@ -4,7 +4,7 @@ import { addDaysDateOnly, dateOnly, isPastRun, todayDateOnly } from '@/lib/progr
 import { groupRunsByPartner } from '@/lib/programGroups';
 import { listPrograms, listRuns, type RunListing } from '@/lib/programsData';
 import { SessionList, type SessionListItem } from '@/components/programs/SessionList';
-import { Ages, EmptyState, Goals, PageHeading, partnerProgramsHref } from '@/components/programs/bits';
+import { Ages, EmptyState, Goals, PageHeading, Panel, Tabs, partnerProgramsHref } from '@/components/programs/bits';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,27 +37,25 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-10">
-      <PageHeading kicker="Programs" title="Programs">
-        <Link href="/runs/new" className="btn-primary">
-          <Plus size={16} /> Add program
-        </Link>
+      <PageHeading title="Programs">
+        {library ? (
+          <Link href="/programs/new" className="btn-primary">
+            <Plus size={16} /> New program
+          </Link>
+        ) : (
+          <Link href="/runs/new" className="btn-primary">
+            <Plus size={16} /> Add program
+          </Link>
+        )}
       </PageHeading>
 
-      <nav className="flex gap-1 mb-8" aria-label="Programs view">
-        {[
-          { href: '/programs', label: 'By partner', active: !library },
+      <Tabs
+        label="Programs view"
+        tabs={[
+          { href: '/programs', label: 'Overview', active: !library },
           { href: '/programs?view=library', label: 'Program library', active: library },
-        ].map((t) => (
-          <Link
-            key={t.href}
-            href={t.href}
-            aria-current={t.active ? 'page' : undefined}
-            className={`px-4 py-2 rounded-full text-sm font-medium ${t.active ? 'bg-ink text-cream' : 'text-ink/70 hover:bg-ink/5'}`}
-          >
-            {t.label}
-          </Link>
-        ))}
-      </nav>
+        ]}
+      />
 
       {library ? (
         <>
@@ -82,27 +80,18 @@ export default async function ProgramsPage({ searchParams }: { searchParams: Pro
               ))}
             </div>
           )}
-          <div className="mt-4">
-            <Link href="/programs/new" className="btn-ghost">
-              <Plus size={14} /> New program in the library
-            </Link>
-          </div>
         </>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-6">
           {due.length > 0 && (
-            <section className="card !p-0 overflow-hidden border-court/30">
-              <h2 className="px-5 pt-4 pb-2 font-display text-lg font-bold">
-                Debriefs due <span className="text-court">{due.length}</span>
-              </h2>
+            <Panel title="Debriefs due" count={due.length} flush>
               <SessionList sessions={due} />
-            </section>
+            </Panel>
           )}
 
-          <section className="card !p-0 overflow-hidden">
-            <h2 className="px-5 pt-4 pb-2 font-display text-lg font-bold">Coming up <span className="text-sm font-normal text-ink/50">next {UPCOMING_DAYS} days</span></h2>
+          <Panel title={`Coming up in the next ${UPCOMING_DAYS} days`} flush>
             <SessionList sessions={upcoming} empty="No sessions in the next two weeks." />
-          </section>
+          </Panel>
 
           <section>
             <h2 className="font-display text-lg font-bold mb-3">Partners</h2>
