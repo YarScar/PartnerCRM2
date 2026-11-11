@@ -50,7 +50,7 @@ export function Nav({ user }: { user: AuthUser | null }) {
                   pathname === href ||
                   pathname.startsWith(href + '/') ||
                   (href === '/settings' && pathname.startsWith('/admin')) ||
-                  (href === '/programs' && pathname.startsWith('/runs'));
+                  (href === '/programs' && (pathname.startsWith('/runs') || pathname.startsWith('/sessions')));
                 return (
                   <Link
                     key={href}

@@ -20,13 +20,13 @@ const NEXT = 3;
  * sessions, then the last few. The full list is on the program's page.
  */
 function CurrentProgram({ run, today }: { run: RunListing; today: string }) {
-  const due = run.sessions.filter((s) => !s.debrief && dateOnly(s.date) <= today);
+  // One stretch in date order around today: the last few sessions (reaching back far
+  // enough to include every debrief still due), then the next few.
+  const past = run.sessions.filter((s) => dateOnly(s.date) <= today);
+  const firstDue = past.findIndex((s) => !s.debrief);
+  const from = Math.max(0, Math.min(past.length - RECENT, firstDue === -1 ? Infinity : firstDue));
   const upcoming = run.sessions.filter((s) => dateOnly(s.date) > today).slice(0, NEXT);
-  const recent = run.sessions
-    .filter((s) => s.debrief && dateOnly(s.date) <= today)
-    .slice(-RECENT)
-    .reverse();
-  const shown = [...due, ...upcoming, ...recent];
+  const shown = [...past.slice(from), ...upcoming];
   const hidden = run.sessions.length - shown.length;
 
   return (

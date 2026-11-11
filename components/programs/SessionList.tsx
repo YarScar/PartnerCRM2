@@ -20,7 +20,8 @@ export function DebriefChip({ date, done }: { date: Date; done: boolean }) {
   const status = debriefStatus(date, done);
   if (status === 'due') return <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-court text-cream whitespace-nowrap">Debrief due</span>;
   if (status === 'done') return <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-800 whitespace-nowrap">Debriefed</span>;
-  return <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-ink/5 text-ink/60 whitespace-nowrap">Upcoming</span>;
+  // Upcoming needs no chip: the date says it, and a quiet row reads faster.
+  return <span />;
 }
 
 /**
