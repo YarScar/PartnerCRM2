@@ -4,78 +4,28 @@ import { Edit2, Plus } from 'lucide-react';
 import { isAdmin } from '@/lib/auth';
 import { pageUser } from '@/lib/pageUser';
 import { parseId } from '@/lib/parseId';
-import { dateOnly, debriefStatus, formatDate, formatTimeRange, isPastRun, todayDateOnly } from '@/lib/programs';
+import { formatAges, formatDate, isPastRun } from '@/lib/programs';
 import { getRun } from '@/lib/programsData';
 import { ArchiveRunButton } from '@/components/programs/ArchiveRunButton';
 import { DeleteButton } from '@/components/programs/DeleteButton';
-import { storedTasks } from '@/components/programs/sessionValues';
-import { Ages, Breadcrumbs, Detail, EmptyState, Goals, PageHeading, RunStatusBadge, partnerProgramsHref } from '@/components/programs/bits';
+import { SessionList } from '@/components/programs/SessionList';
+import { Breadcrumbs, Goals, RunStatusBadge, partnerProgramsHref } from '@/components/programs/bits';
 
 export const dynamic = 'force-dynamic';
 
-type Session = NonNullable<Awaited<ReturnType<typeof getRun>>>['sessions'][number];
-
-function SessionCard({ s, number }: { s: Session; number: number }) {
-  const tasks = storedTasks(s.tasks);
-  const open = tasks.filter((t) => !t.done).length;
-  const team = [...s.facilitation_team, ...s.development_team.filter((n) => !s.facilitation_team.includes(n))];
-  return (
-    <Link href={`/sessions/${s.id}`} className="block border border-ink/10 rounded-xl px-5 py-4 bg-cream hover:border-court/40 transition-colors">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <div className="text-[10px] uppercase tracking-widest text-ink/50">Session {number}</div>
-          <div className="font-semibold">
-            {formatDate(s.date)}
-            {s.title && <span className="font-normal text-ink/70"> — {s.title}</span>}
-          </div>
-          <div className="text-xs text-ink/50">
-            {[formatTimeRange(s.start_time, s.end_time), s.location, s.creator_count != null && `${s.creator_count} creators`].filter(Boolean).join(' · ')}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {tasks.length > 0 && (
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${open ? 'bg-court/10 text-court' : 'bg-emerald-100 text-emerald-800'}`}>
-              {open ? `${open} task${open === 1 ? '' : 's'} open` : 'Tasks done'}
-            </span>
-          )}
-          <DebriefBadge s={s} />
-        </div>
-      </div>
-      {s.activities.length > 0 && (
-        <div className="text-xs text-ink/70 mt-2">Activities: {s.activities.map((a) => a.activity.name).join(', ')}</div>
-      )}
-      {team.length > 0 && <div className="text-xs text-ink/50 mt-1">Team: {team.join(', ')}</div>}
-    </Link>
-  );
-}
-
-function DebriefBadge({ s }: { s: Session }) {
-  const status = debriefStatus(s.date, Boolean(s.debrief));
-  if (status === 'upcoming') return null;
-  if (status === 'due') {
-    return <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-court text-cream">Debrief due</span>;
-  }
-  const facts = [s.debrief?.attendance != null && `${s.debrief.attendance} came`, s.debrief?.engagement && `engagement ${s.debrief.engagement}/5`];
-  return (
-    <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-800">
-      Debriefed{facts.some(Boolean) ? ` · ${facts.filter(Boolean).join(' · ')}` : ''}
-    </span>
-  );
-}
-
+/** A program with a partner: one line of facts, then every session in date order. */
 export default async function RunPage({ params }: { params: Promise<{ id: string }> }) {
   const id = parseId((await params).id);
   const run = id ? await getRun(id) : null;
   if (!run) notFound();
   const user = await pageUser();
-  const today = todayDateOnly();
-  const numbered = run.sessions.map((s, i) => ({ s, number: i + 1 }));
-  const upcoming = numbered.filter(({ s }) => dateOnly(s.date) >= today);
-  const past = numbered.filter(({ s }) => dateOnly(s.date) < today).reverse();
-  const dates = [formatDate(run.start_date), formatDate(run.end_date)].filter(Boolean).join(' to ');
+  const ages = formatAges(run.age_min, run.age_max);
+  const dates = [formatDate(run.start_date), formatDate(run.end_date)].filter(Boolean).join(' – ');
+  const facts = [dates, run.location, ages && `Ages ${ages}`, run.participant_count != null && `${run.participant_count} creators`].filter(Boolean);
+  const hasDetails = Boolean(run.what_changed || run.notes || run.program.goals.length);
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
+    <div className="max-w-4xl mx-auto px-6 py-10 space-y-6">
       <div>
         <Breadcrumbs
           items={[
@@ -84,69 +34,70 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
             { label: `${run.program.name} · ${run.name}` },
           ]}
         />
-        <PageHeading kicker={`${run.partner?.org_name ?? 'Our own'} · ${run.name}`} title={run.program.name}>
-          <Link href={`/runs/${run.id}/edit`} className="btn-secondary">
-            <Edit2 size={14} /> Edit
-          </Link>
-          <ArchiveRunButton runId={run.id} past={isPastRun(run.status)} />
-          {isAdmin(user) && (
-            <DeleteButton
-              url={`/api/runs/${run.id}`}
-              after={partnerProgramsHref(run.partner?.id)}
-              what={run.name}
-              warning={run.sessions.length ? `Its ${run.sessions.length} session(s) are deleted too.` : undefined}
-            />
-          )}
-        </PageHeading>
-        <div className="card space-y-4">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink/70">
-            <RunStatusBadge status={run.status} />
-            <Link href={`/programs/${run.program.id}`} className="underline hover:text-court">Program details</Link>
-            {run.partner ? (
-              <Link href={`/partners/${run.partner.id}`} className="underline hover:text-court">{run.partner.org_name}</Link>
-            ) : (
-              <span>No partner</span>
-            )}
-            {dates && <span>{dates}</span>}
-            {run.location && <span>{run.location}</span>}
-            <Ages min={run.age_min} max={run.age_max} />
-            {run.participant_count != null && <span>{run.participant_count} participants</span>}
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight">{run.program.name}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink/60">
+              <span className="font-medium text-ink">{run.name}</span>
+              <RunStatusBadge status={run.status} />
+              {facts.map((f) => (
+                <span key={String(f)}>· {f}</span>
+              ))}
+            </div>
           </div>
-          <Goals goals={run.program.goals} />
-          <Detail label="What's different this time">{run.what_changed}</Detail>
-          <Detail label="Notes">{run.notes}</Detail>
+          <div className="flex flex-wrap items-center gap-1">
+            <Link href={`/sessions/new?run=${run.id}`} className="btn-primary">
+              <Plus size={14} /> Session
+            </Link>
+            <Link href={`/runs/${run.id}/edit`} className="btn-ghost" aria-label="Edit program details">
+              <Edit2 size={14} /> Edit
+            </Link>
+          </div>
         </div>
       </div>
 
-      <section className="card space-y-4">
-        <div className="flex items-end justify-between gap-4 flex-wrap">
-          <div>
-            <h2 className="font-display text-2xl font-bold">Sessions</h2>
-            <p className="text-sm text-ink/60">The ongoing record: one entry per session, with its time, team, docs and tasks.</p>
-          </div>
-          <Link href={`/sessions/new?run=${run.id}`} className="btn-primary">
-            <Plus size={14} /> New session
-          </Link>
-        </div>
-        {run.sessions.length === 0 ? (
-          <EmptyState>No sessions yet. Add the first one.</EmptyState>
-        ) : (
-          <div className="space-y-6">
-            {upcoming.length > 0 && (
-              <div className="space-y-2">
-                <div className="label-base">Upcoming</div>
-                {upcoming.map(({ s, number }) => <SessionCard key={s.id} s={s} number={number} />)}
-              </div>
-            )}
-            {past.length > 0 && (
-              <div className="space-y-2">
-                <div className="label-base">Past (newest first)</div>
-                {past.map(({ s, number }) => <SessionCard key={s.id} s={s} number={number} />)}
-              </div>
-            )}
-          </div>
-        )}
+      <section className="card !p-0 overflow-hidden">
+        <h2 className="px-5 pt-4 pb-2 font-display text-lg font-bold">
+          Sessions <span className="text-sm font-normal text-ink/50">{run.sessions.length}</span>
+        </h2>
+        <SessionList sessions={run.sessions} empty="No sessions yet. Add the first one." />
       </section>
+
+      {hasDetails && (
+        <details className="card">
+          <summary className="cursor-pointer font-semibold">Program details</summary>
+          <div className="mt-4 space-y-4 text-sm">
+            <Goals goals={run.program.goals} />
+            {run.what_changed && (
+              <div>
+                <div className="label-base">What&apos;s different this time</div>
+                <p className="whitespace-pre-wrap">{run.what_changed}</p>
+              </div>
+            )}
+            {run.notes && (
+              <div>
+                <div className="label-base">Notes</div>
+                <p className="whitespace-pre-wrap">{run.notes}</p>
+              </div>
+            )}
+            <Link href={`/programs/${run.program.id}`} className="inline-block underline text-ink/70 hover:text-court">
+              {run.program.name} in the program library
+            </Link>
+          </div>
+        </details>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-ink/10">
+        <ArchiveRunButton runId={run.id} past={isPastRun(run.status)} />
+        {isAdmin(user) && (
+          <DeleteButton
+            url={`/api/runs/${run.id}`}
+            after={partnerProgramsHref(run.partner?.id)}
+            what={`${run.program.name} · ${run.name}`}
+            warning={run.sessions.length ? `Its ${run.sessions.length} session(s) and their debriefs are deleted too.` : undefined}
+          />
+        )}
+      </div>
     </div>
   );
 }

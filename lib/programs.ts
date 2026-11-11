@@ -614,3 +614,10 @@ export function debriefStatus(sessionDate: Date, hasDebrief: boolean, today = to
   if (hasDebrief) return 'done';
   return dateOnly(sessionDate) <= today ? 'due' : 'upcoming';
 }
+
+/** A YYYY-MM-DD date moved by n days. */
+export function addDaysDateOnly(ymd: string, n: number): string {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}

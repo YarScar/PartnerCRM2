@@ -84,7 +84,7 @@ export async function setProgramActivities(programId: number, items: ActivityLis
 const runListing = {
   program: { select: { id: true, name: true } },
   partner: { select: { id: true, org_name: true } },
-  sessions: { orderBy: { date: 'asc' as const }, select: { id: true, date: true, title: true, debrief: { select: { id: true } } } },
+  sessions: { orderBy: { date: 'asc' as const }, select: { id: true, date: true, title: true, start_time: true, end_time: true, debrief: { select: { id: true } } } },
 } satisfies Prisma.ProgramRunInclude;
 
 export type RunListing = Prisma.ProgramRunGetPayload<{ include: typeof runListing }>;

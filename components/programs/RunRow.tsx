@@ -33,7 +33,8 @@ export function RunRow({ run }: { run: RunListing }) {
             {due} debrief{due === 1 ? '' : 's'} due
           </span>
         )}
-        <RunStatusBadge status={run.status} />
+        {/* Only the statuses that tell you something the list's heading doesn't. */}
+        {(run.status === 'Planned' || run.status === 'Cancelled') && <RunStatusBadge status={run.status} />}
         <ArrowUpRight size={16} className="text-ink/30 group-hover:text-court" />
       </div>
     </Link>

@@ -42,6 +42,8 @@ export function ActivityListEditor({
   const [rows, setRows] = useState<Row[]>(initial);
   const [saved, setSaved] = useState(JSON.stringify(initial.map(key)));
   const [search, setSearch] = useState('');
+  // Suggestions stay behind a button so the list itself is what the page shows first.
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const { saving, error, send } = useSave();
   const dirty = JSON.stringify(rows.map(key)) !== saved;
 
@@ -151,7 +153,13 @@ export function ActivityListEditor({
         )}
       </div>
 
-      {suggestions.length > 0 && (
+      {suggestions.length > 0 && !showSuggestions && (
+        <button type="button" className="btn-ghost text-court" onClick={() => setShowSuggestions(true)}>
+          <Lightbulb size={14} /> Suggest activities ({suggestions.length})
+        </button>
+      )}
+
+      {suggestions.length > 0 && showSuggestions && (
         <div className="rounded-xl border border-court/20 bg-court/5 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold mb-3">
             <Lightbulb size={15} className="text-court" />
