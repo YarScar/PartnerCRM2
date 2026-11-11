@@ -31,6 +31,29 @@ export function BackLink({ href, label }: { href: string; label: string }) {
   );
 }
 
+/** "Programs › Launchpad › 3D Geospatial Club" — every step but the last is a link. */
+export function Breadcrumbs({ items }: { items: { label: string; href?: string }[] }) {
+  return (
+    <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 text-sm text-ink/60 mb-6">
+      {items.map((item, i) => (
+        <span key={i} className="inline-flex items-center gap-1.5">
+          {i > 0 && <span className="text-ink/30">›</span>}
+          {item.href ? (
+            <Link href={item.href} className="hover:text-ink underline-offset-2 hover:underline">{item.label}</Link>
+          ) : (
+            <span className="text-ink">{item.label}</span>
+          )}
+        </span>
+      ))}
+    </nav>
+  );
+}
+
+/** The link to a partner's programs page ("own" for programs with no partner). */
+export function partnerProgramsHref(partnerId: number | null | undefined) {
+  return `/programs/partners/${partnerId ?? 'own'}`;
+}
+
 export function PageHeading({ kicker, title, children }: { kicker: string; title: string; children?: React.ReactNode }) {
   return (
     <div className="flex items-end justify-between gap-4 flex-wrap mb-8">

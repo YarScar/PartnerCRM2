@@ -5,13 +5,14 @@ import { isAdmin } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { pageUser } from '@/lib/pageUser';
 import { parseId } from '@/lib/parseId';
-import { formatDate, formatTime, formatTimeRange, splitLinks } from '@/lib/programs';
+import { debriefStatus, formatDate, formatTime, formatTimeRange, splitLinks } from '@/lib/programs';
 import { getSession, listActivityCards } from '@/lib/programsData';
 import { ActivityListEditor } from '@/components/programs/ActivityListEditor';
+import { DebriefForm } from '@/components/programs/DebriefForm';
 import { DeleteButton } from '@/components/programs/DeleteButton';
 import { TaskListEditor } from '@/components/programs/TaskListEditor';
 import { storedTasks } from '@/components/programs/sessionValues';
-import { BackLink, PageHeading } from '@/components/programs/bits';
+import { Breadcrumbs, PageHeading, partnerProgramsHref } from '@/components/programs/bits';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,11 +66,19 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   const next = siblings[at + 1];
   const { run } = session;
   const otherDocs = splitLinks(session.other_links);
+  const status = debriefStatus(session.date, Boolean(session.debrief));
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-10 space-y-8">
       <div>
-        <BackLink href={`/runs/${run.id}`} label={`${run.program.name} · ${run.name}`} />
+        <Breadcrumbs
+          items={[
+            { label: 'Programs', href: '/programs' },
+            { label: run.partner?.org_name ?? 'Our own programs', href: partnerProgramsHref(run.partner?.id) },
+            { label: `${run.program.name} · ${run.name}`, href: `/runs/${run.id}` },
+            { label: `Session ${at + 1}` },
+          ]}
+        />
         <PageHeading
           kicker={`${run.partner?.org_name ? `${run.partner.org_name} · ` : ''}${run.program.name} · ${run.name} · Session ${at + 1} of ${siblings.length}`}
           title={session.title || formatDate(session.date)}
@@ -128,6 +137,34 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
           </Row>
         </div>
       </div>
+
+      <section id="debrief" className={`card space-y-4 scroll-mt-24 ${status === 'due' ? 'border-court/40' : ''}`}>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="font-display text-xl font-bold">Session debrief</h2>
+          {status === 'due' && <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-court text-cream">Debrief due</span>}
+          {status === 'done' && <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-800">Debriefed</span>}
+        </div>
+        <DebriefForm
+          sessionId={session.id}
+          status={status}
+          plannedCount={session.creator_count}
+          saved={
+            session.debrief
+              ? {
+                  attendance: session.debrief.attendance?.toString() ?? '',
+                  engagement: session.debrief.engagement?.toString() ?? '',
+                  went_well: session.debrief.went_well ?? '',
+                  to_improve: session.debrief.to_improve ?? '',
+                  changes_next_time: session.debrief.changes_next_time ?? '',
+                  highlights: session.debrief.highlights ?? '',
+                  follow_ups: session.debrief.follow_ups ?? '',
+                  submitted_by: session.debrief.submitted_by,
+                  updated_at: session.debrief.updated_at.toISOString(),
+                }
+              : null
+          }
+        />
+      </section>
 
       <section className="card space-y-3">
         <h2 className="font-display text-xl font-bold">General tasks</h2>

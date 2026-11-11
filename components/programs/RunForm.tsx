@@ -23,6 +23,9 @@ export type RunFormValues = {
 
 type Option = { id: number; name: string };
 
+/** The "+ New program…" choice: the program is created in the library with the run. */
+const NEW_PROGRAM = 'new';
+
 export function RunForm({
   initial,
   programs,
@@ -33,7 +36,9 @@ export function RunForm({
   partners: Option[];
 }) {
   const [v, setV] = useState<RunFormValues>(initial);
+  const [newProgramName, setNewProgramName] = useState('');
   const { saving, error, send } = useSave();
+  const creatingProgram = v.program_id === NEW_PROGRAM;
   const set = (patch: Partial<RunFormValues>) => setV((cur) => ({ ...cur, ...patch }));
   const editing = Boolean(v.id);
 
@@ -42,7 +47,8 @@ export function RunForm({
     const blankToNull = (s: string) => (s === '' ? null : s);
     const body = {
       ...v,
-      program_id: editing ? undefined : v.program_id,
+      program_id: editing || creatingProgram ? undefined : v.program_id,
+      new_program_name: !editing && creatingProgram ? newProgramName : undefined,
       partner_id: blankToNull(v.partner_id),
       start_date: blankToNull(v.start_date),
       end_date: blankToNull(v.end_date),
@@ -65,7 +71,20 @@ export function RunForm({
             {programs.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
+            {!editing && <option value={NEW_PROGRAM}>+ New program…</option>}
           </select>
+          {creatingProgram && (
+            <input
+              className="input-base mt-2"
+              required
+              maxLength={200}
+              autoFocus
+              value={newProgramName}
+              onChange={(e) => setNewProgramName(e.target.value)}
+              placeholder="New program name, e.g. 3D Design Club"
+              aria-label="New program name"
+            />
+          )}
         </div>
         <div>
           <label className="label-base" htmlFor="partner">Partner</label>
@@ -79,7 +98,7 @@ export function RunForm({
       </div>
       <div className="grid md:grid-cols-3 gap-4">
         <div className="md:col-span-2">
-          <label className="label-base" htmlFor="name">Name for this run *</label>
+          <label className="label-base" htmlFor="name">Term or label *</label>
           <input id="name" className="input-base" required maxLength={200} value={v.name} onChange={(e) => set({ name: e.target.value })} placeholder="e.g. 2026–2027, or 09/30 one-day event" />
         </div>
         <div>
@@ -131,7 +150,7 @@ export function RunForm({
       {error && <div className="text-sm text-court">{error}</div>}
       <button className="btn-primary" disabled={saving}>
         <Save size={14} />
-        {saving ? 'Saving...' : editing ? 'Save changes' : 'Create run'}
+        {saving ? 'Saving...' : editing ? 'Save changes' : 'Add program'}
       </button>
     </form>
   );

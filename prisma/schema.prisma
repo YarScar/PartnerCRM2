@@ -215,6 +215,7 @@ model ProgramSession {
 
   run        ProgramRun        @relation(fields: [run_id], references: [id], onDelete: Cascade)
   activities SessionActivity[]
+  debrief    SessionDebrief?
 
   @@index([run_id, date], map: "idx_program_sessions_run_id_date")
   @@map("program_sessions")
@@ -274,4 +275,25 @@ model SessionActivity {
 
   @@index([session_id], map: "idx_session_activities_session_id")
   @@map("session_activities")
+}
+
+// The after-session debrief (an after-action review): who came, how it went, what to
+// change next time and what needs following up. One per session, editable afterwards.
+model SessionDebrief {
+  id                Int      @id @default(autoincrement())
+  session_id        Int      @unique
+  attendance        Int?
+  engagement        Int?
+  went_well         String?
+  to_improve        String?
+  changes_next_time String?
+  highlights        String?
+  follow_ups        String?
+  submitted_by      String
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+
+  session ProgramSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
+
+  @@map("session_debriefs")
 }

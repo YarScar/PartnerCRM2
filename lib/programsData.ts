@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from './db';
-import type { ActivityData, ActivityListItem, ProgramData, RunData, SessionData } from './programs';
+import type { ActivityData, ActivityListItem, DebriefData, ProgramData, RunData, SessionData } from './programs';
 
 /** All program, run and activity queries. Input is already checked by lib/programs.ts. */
 
@@ -84,7 +84,7 @@ export async function setProgramActivities(programId: number, items: ActivityLis
 const runListing = {
   program: { select: { id: true, name: true } },
   partner: { select: { id: true, org_name: true } },
-  sessions: { orderBy: { date: 'asc' as const }, select: { date: true } },
+  sessions: { orderBy: { date: 'asc' as const }, select: { id: true, date: true, title: true, debrief: { select: { id: true } } } },
 } satisfies Prisma.ProgramRunInclude;
 
 export type RunListing = Prisma.ProgramRunGetPayload<{ include: typeof runListing }>;
@@ -94,7 +94,7 @@ export function listRuns() {
   return prisma.programRun.findMany({ orderBy: [{ start_date: 'desc' }, { id: 'desc' }], include: runListing });
 }
 
-export function listRunsForPartner(partnerId: number) {
+export function listRunsForPartner(partnerId: number | null) {
   return prisma.programRun.findMany({
     where: { partner_id: partnerId },
     orderBy: [{ start_date: 'desc' }, { id: 'desc' }],
@@ -110,27 +110,39 @@ export function getRun(id: number) {
       partner: { select: { id: true, org_name: true, youth_ages: true } },
       sessions: {
         orderBy: [{ date: 'asc' }, { start_time: 'asc' }],
-        include: { activities: { orderBy: { sort_order: 'asc' }, include: { activity: { select: { id: true, name: true } } } } },
+        include: {
+          activities: { orderBy: { sort_order: 'asc' }, include: { activity: { select: { id: true, name: true } } } },
+          debrief: { select: { attendance: true, engagement: true } },
+        },
       },
     },
   });
 }
 
-/** Creates a run. Ages default to the program's until the run says otherwise. */
+/**
+ * Creates a run of a library program, or of a new program named here (added to the
+ * library in the same step). Ages default to the program's until the run says otherwise.
+ */
 export async function createRun(data: RunData) {
-  const program = await prisma.program.findUnique({ where: { id: data.program_id! } });
-  if (!program) return { ok: false, error: 'Program not found' } as const;
-  if (data.partner_id && !(await prisma.partner.findUnique({ where: { id: data.partner_id }, select: { id: true } }))) {
-    return { ok: false, error: 'Partner not found' } as const;
-  }
-  const run = await prisma.programRun.create({
-    data: {
-      ...(data as Prisma.ProgramRunUncheckedCreateInput),
-      age_min: data.age_min !== undefined ? data.age_min : program.age_min,
-      age_max: data.age_max !== undefined ? data.age_max : program.age_max,
-    },
+  const { new_program_name, ...runData } = data;
+  return prisma.$transaction(async (tx) => {
+    if (runData.partner_id && !(await tx.partner.findUnique({ where: { id: runData.partner_id }, select: { id: true } }))) {
+      return { ok: false, error: 'Partner not found' } as const;
+    }
+    const program = new_program_name
+      ? await tx.program.create({ data: { name: new_program_name } })
+      : await tx.program.findUnique({ where: { id: runData.program_id! } });
+    if (!program) return { ok: false, error: 'Program not found' } as const;
+    const run = await tx.programRun.create({
+      data: {
+        ...(runData as Prisma.ProgramRunUncheckedCreateInput),
+        program_id: program.id,
+        age_min: runData.age_min !== undefined ? runData.age_min : program.age_min,
+        age_max: runData.age_max !== undefined ? runData.age_max : program.age_max,
+      },
+    });
+    return { ok: true, run } as const;
   });
-  return { ok: true, run } as const;
 }
 
 export async function updateRun(id: number, data: RunData) {
@@ -173,7 +185,18 @@ export function getSession(id: number) {
         },
       },
       activities: { orderBy: { sort_order: 'asc' }, include: { activity: { select: activityCard } } },
+      debrief: true,
     },
+  });
+}
+
+/** Saves (or replaces) a session's debrief; null if the session is gone. */
+export async function saveDebrief(sessionId: number, data: DebriefData, submittedBy: string) {
+  if (!(await prisma.programSession.findUnique({ where: { id: sessionId }, select: { id: true } }))) return null;
+  return prisma.sessionDebrief.upsert({
+    where: { session_id: sessionId },
+    create: { ...data, session_id: sessionId, submitted_by: submittedBy },
+    update: { ...data, submitted_by: submittedBy },
   });
 }
 

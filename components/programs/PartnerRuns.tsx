@@ -14,10 +14,10 @@ export function PartnerRuns({ partnerId, runs }: { partnerId: number; runs: RunL
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <h2 className="font-display text-2xl font-bold">Programs with this partner</h2>
-          <p className="text-sm text-ink/60">Each run of a program with them, and its sessions.</p>
+          <p className="text-sm text-ink/60">Their current and past programs. <Link href={`/programs/partners/${partnerId}`} className="underline">Open all programs and debriefs</Link></p>
         </div>
         <Link href={`/runs/new?partner=${partnerId}`} className="btn-secondary">
-          <Plus size={14} /> New run
+          <Plus size={14} /> Add program
         </Link>
       </div>
       {runs.length === 0 ? (

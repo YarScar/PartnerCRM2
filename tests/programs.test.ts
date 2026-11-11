@@ -59,7 +59,7 @@ describe('validateActivity', () => {
 
 describe('validateRun', () => {
   it('needs a program and a name when created', () => {
-    assert.match(error(validateRun({ name: 'Spring' })), /Program is required/);
+    assert.match(error(validateRun({ name: 'Spring' })), /Choose a program or name a new one/);
     assert.match(error(validateRun({ program_id: 1 })), /Name is required/);
   });
 

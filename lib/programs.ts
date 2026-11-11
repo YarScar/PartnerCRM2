@@ -201,6 +201,8 @@ export function validateActivity(input: unknown, { partial = false } = {}): Resu
 
 export type RunData = {
   program_id?: number;
+  /** Instead of program_id: create this program in the library and run it. */
+  new_program_name?: string;
   partner_id?: number | null;
   name?: string;
   status?: RunStatus;
@@ -221,6 +223,7 @@ export function validateRun(input: unknown, { partial = false } = {}): Result<Ru
     [
       // A run stays with the program it was made for.
       ['Program', () => (partial ? undefined : int(b.program_id, 1, 2 ** 31 - 1))],
+      ['New program name', () => (partial ? undefined : text(b.new_program_name, MAX_TEXT))],
       ['Partner', () => int(b.partner_id, 1, 2 ** 31 - 1)],
       ['Name', () => text(b.name, MAX_TEXT)],
       ['Status', () => text(b.status, 40)],
@@ -234,7 +237,8 @@ export function validateRun(input: unknown, { partial = false } = {}): Result<Ru
       ['Notes', () => text(b.notes, MAX_LONG_TEXT)],
     ],
     (v) => {
-      if (!partial && !v.Program) return 'Program is required';
+      if (!partial && !v.Program && !v['New program name']) return 'Choose a program or name a new one';
+      if (v.Program && v['New program name']) return 'Choose a program or name a new one, not both';
       if ((!partial || v.Name !== undefined) && !v.Name) return 'Name is required';
       if (v.Status != null && !(RUN_STATUSES as readonly string[]).includes(v.Status)) {
         return `Status must be one of ${RUN_STATUSES.join(', ')}`;
@@ -244,6 +248,7 @@ export function validateRun(input: unknown, { partial = false } = {}): Result<Ru
       if (ages) return ages;
       return defined({
         program_id: v.Program ?? undefined,
+        new_program_name: v['New program name'] ?? undefined,
         partner_id: v.Partner,
         name: v.Name ?? undefined,
         status: v.Status ?? undefined,
@@ -550,4 +555,62 @@ export function splitLinks(textBlock: string | null | undefined): { text: string
       const m = line.match(/https?:\/\/\S+/);
       return { text: line, href: m ? m[0] : null };
     });
+}
+
+// ---------- Debriefs ----------
+
+export const ENGAGEMENT_LABELS: Record<number, string> = {
+  1: 'Very low',
+  2: 'Low',
+  3: 'Okay',
+  4: 'Good',
+  5: 'Excellent',
+};
+
+export type DebriefData = {
+  attendance?: number | null;
+  engagement?: number | null;
+  went_well?: string | null;
+  to_improve?: string | null;
+  changes_next_time?: string | null;
+  highlights?: string | null;
+  follow_ups?: string | null;
+};
+
+/** The after-session debrief. Needs at least one answer so an empty form isn't saved as done. */
+export function validateDebrief(input: unknown): Result<DebriefData> {
+  if (!input || typeof input !== 'object') return { ok: false, error: 'Send the debrief as an object' };
+  const b = input as Input;
+  return collect<DebriefData>(
+    [
+      ['Attendance', () => int(b.attendance, 0, 100_000)],
+      ['Engagement', () => int(b.engagement, 1, 5)],
+      ['What went well', () => text(b.went_well, MAX_LONG_TEXT)],
+      ['What to improve', () => text(b.to_improve, MAX_LONG_TEXT)],
+      ['Changes for next time', () => text(b.changes_next_time, MAX_LONG_TEXT)],
+      ['Highlights', () => text(b.highlights, MAX_LONG_TEXT)],
+      ['Follow-ups', () => text(b.follow_ups, MAX_LONG_TEXT)],
+    ],
+    (v) => {
+      const data: DebriefData = {
+        attendance: v.Attendance ?? null,
+        engagement: v.Engagement ?? null,
+        went_well: v['What went well'] ?? null,
+        to_improve: v['What to improve'] ?? null,
+        changes_next_time: v['Changes for next time'] ?? null,
+        highlights: v.Highlights ?? null,
+        follow_ups: v['Follow-ups'] ?? null,
+      };
+      if (Object.values(data).every((x) => x == null)) return 'Fill in at least one part of the debrief';
+      return data;
+    }
+  );
+}
+
+export type DebriefStatus = 'done' | 'due' | 'upcoming';
+
+/** A session on or before today without a debrief is due; later ones are upcoming. */
+export function debriefStatus(sessionDate: Date, hasDebrief: boolean, today = todayDateOnly()): DebriefStatus {
+  if (hasDebrief) return 'done';
+  return dateOnly(sessionDate) <= today ? 'due' : 'upcoming';
 }

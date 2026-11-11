@@ -4,11 +4,12 @@ import { Edit2, Plus } from 'lucide-react';
 import { isAdmin } from '@/lib/auth';
 import { pageUser } from '@/lib/pageUser';
 import { parseId } from '@/lib/parseId';
-import { dateOnly, formatDate, formatTimeRange, todayDateOnly } from '@/lib/programs';
+import { dateOnly, debriefStatus, formatDate, formatTimeRange, isPastRun, todayDateOnly } from '@/lib/programs';
 import { getRun } from '@/lib/programsData';
+import { ArchiveRunButton } from '@/components/programs/ArchiveRunButton';
 import { DeleteButton } from '@/components/programs/DeleteButton';
 import { storedTasks } from '@/components/programs/sessionValues';
-import { Ages, BackLink, Detail, EmptyState, Goals, PageHeading, RunStatusBadge } from '@/components/programs/bits';
+import { Ages, Breadcrumbs, Detail, EmptyState, Goals, PageHeading, RunStatusBadge, partnerProgramsHref } from '@/components/programs/bits';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,17 +32,34 @@ function SessionCard({ s, number }: { s: Session; number: number }) {
             {[formatTimeRange(s.start_time, s.end_time), s.location, s.creator_count != null && `${s.creator_count} creators`].filter(Boolean).join(' · ')}
           </div>
         </div>
-        {tasks.length > 0 && (
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${open ? 'bg-court/10 text-court' : 'bg-emerald-100 text-emerald-800'}`}>
-            {open ? `${open} task${open === 1 ? '' : 's'} open` : 'Tasks done'}
-          </span>
-        )}
+        <div className="flex flex-wrap gap-1.5">
+          {tasks.length > 0 && (
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${open ? 'bg-court/10 text-court' : 'bg-emerald-100 text-emerald-800'}`}>
+              {open ? `${open} task${open === 1 ? '' : 's'} open` : 'Tasks done'}
+            </span>
+          )}
+          <DebriefBadge s={s} />
+        </div>
       </div>
       {s.activities.length > 0 && (
         <div className="text-xs text-ink/70 mt-2">Activities: {s.activities.map((a) => a.activity.name).join(', ')}</div>
       )}
       {team.length > 0 && <div className="text-xs text-ink/50 mt-1">Team: {team.join(', ')}</div>}
     </Link>
+  );
+}
+
+function DebriefBadge({ s }: { s: Session }) {
+  const status = debriefStatus(s.date, Boolean(s.debrief));
+  if (status === 'upcoming') return null;
+  if (status === 'due') {
+    return <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-court text-cream">Debrief due</span>;
+  }
+  const facts = [s.debrief?.attendance != null && `${s.debrief.attendance} came`, s.debrief?.engagement && `engagement ${s.debrief.engagement}/5`];
+  return (
+    <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-800">
+      Debriefed{facts.some(Boolean) ? ` · ${facts.filter(Boolean).join(' · ')}` : ''}
+    </span>
   );
 }
 
@@ -59,15 +77,22 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
   return (
     <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
       <div>
-        <BackLink href={`/programs/${run.program.id}`} label={run.program.name} />
-        <PageHeading kicker={`${run.partner?.org_name ?? 'Our own'} · ${run.program.name}`} title={run.name}>
+        <Breadcrumbs
+          items={[
+            { label: 'Programs', href: '/programs' },
+            { label: run.partner?.org_name ?? 'Our own programs', href: partnerProgramsHref(run.partner?.id) },
+            { label: `${run.program.name} · ${run.name}` },
+          ]}
+        />
+        <PageHeading kicker={`${run.partner?.org_name ?? 'Our own'} · ${run.name}`} title={run.program.name}>
           <Link href={`/runs/${run.id}/edit`} className="btn-secondary">
             <Edit2 size={14} /> Edit
           </Link>
+          <ArchiveRunButton runId={run.id} past={isPastRun(run.status)} />
           {isAdmin(user) && (
             <DeleteButton
               url={`/api/runs/${run.id}`}
-              after={`/programs/${run.program.id}`}
+              after={partnerProgramsHref(run.partner?.id)}
               what={run.name}
               warning={run.sessions.length ? `Its ${run.sessions.length} session(s) are deleted too.` : undefined}
             />
@@ -76,6 +101,7 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
         <div className="card space-y-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink/70">
             <RunStatusBadge status={run.status} />
+            <Link href={`/programs/${run.program.id}`} className="underline hover:text-court">Program details</Link>
             {run.partner ? (
               <Link href={`/partners/${run.partner.id}`} className="underline hover:text-court">{run.partner.org_name}</Link>
             ) : (
