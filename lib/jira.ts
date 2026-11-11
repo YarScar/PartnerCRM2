@@ -18,7 +18,7 @@ export type JiraTask = {
 };
 
 export type JiraResult =
-  | { ok: true; tasks: JiraTask[]; total: number; searchUrl: string }
+  | { ok: true; tasks: JiraTask[]; total: number; searchUrl: string; demo?: boolean }
   | { ok: false; reason: 'not_configured' | 'not_linked' | 'auth' | 'bad_link' | 'unavailable'; searchUrl?: string };
 
 const MAX_TASKS = 50;
@@ -49,6 +49,17 @@ type RawIssue = {
   };
 };
 
+const CATEGORY_ORDER: JiraTask['category'][] = ['indeterminate', 'new', 'done'];
+
+/** In progress first, then to do, then done; within each, soonest due first (no due date last). */
+export function sortTasks(tasks: JiraTask[]): JiraTask[] {
+  return [...tasks].sort(
+    (a, b) =>
+      CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category) ||
+      (a.due ?? '9999').localeCompare(b.due ?? '9999')
+  );
+}
+
 /** Jira's search response as plain tasks; anything malformed is skipped. */
 export function mapIssues(base: string, issues: unknown): JiraTask[] {
   if (!Array.isArray(issues)) return [];
@@ -78,6 +89,7 @@ export async function fetchJiraTasks(
   const config = jiraConfig(env);
   const base = config?.base ?? env.JIRA_BASE_URL?.trim().replace(/\/+$/, '');
   const searchUrl = base && /^https:\/\//.test(base) ? jiraSearchUrl(base, jql) : undefined;
+  if (!config && jiraDemoEnabled(env)) return demoTasks(link);
   if (!config) return { ok: false, reason: 'not_configured', searchUrl };
 
   const hit = cache.get(jql);
@@ -107,7 +119,7 @@ export async function fetchJiraTasks(
       result = { ok: false, reason: 'unavailable', searchUrl };
     } else {
       const body = (await res.json()) as { issues?: unknown; total?: number; isLast?: boolean };
-      const tasks = mapIssues(config.base, body.issues);
+      const tasks = sortTasks(mapIssues(config.base, body.issues));
       result = { ok: true, tasks, total: typeof body.total === 'number' ? body.total : tasks.length, searchUrl: searchUrl! };
     }
   } catch (err) {
@@ -116,4 +128,38 @@ export async function fetchJiraTasks(
   }
   cache.set(jql, { at: Date.now(), result });
   return result;
+}
+
+// ---------- Demo mode ----------
+
+/**
+ * JIRA_DEMO=true shows sample tasks, clearly labeled, so the feature can be shown before
+ * Jira is connected. Ignored once real Jira settings exist, and never on Vercel production.
+ */
+export function jiraDemoEnabled(env: Record<string, string | undefined> = process.env) {
+  return env.JIRA_DEMO === 'true' && env.VERCEL_ENV !== 'production';
+}
+
+const DEMO_TASKS: [summary: string, status: string, category: JiraTask['category'], assignee: string | null, dueInDays: number | null][] = [
+  ['Book room and confirm the schedule with the partner', 'Done', 'done', 'Liz', -21],
+  ['Build the session slides', 'Done', 'done', 'Jordan', -7],
+  ['Order PLA filament and printer parts', 'In Progress', 'indeterminate', 'Marcus', 2],
+  ['Collect photo releases from families', 'In Progress', 'indeterminate', 'Amara', 5],
+  ['Print handouts for next session', 'To Do', 'new', 'Priya', 6],
+  ['Send the recap and slides to the partner', 'To Do', 'new', 'Liz', 8],
+  ['Plan the end-of-term showcase', 'To Do', 'new', null, 30],
+];
+
+/** Sample tasks for a linked program, keyed off its epic or label so each program looks its own. */
+export function demoTasks(link: { jira_epic?: string | null; jira_label?: string | null }, today = new Date()): JiraResult {
+  const project = link.jira_epic?.split('-')[0] ?? 'DEMO';
+  const seed = [...(link.jira_epic ?? link.jira_label ?? '')].reduce((n, c) => n + c.charCodeAt(0), 0);
+  const base = 'https://your-team.atlassian.net';
+  const tasks = DEMO_TASKS.map(([summary, status, category, assignee, dueInDays], i) => {
+    const key = `${project}-${100 + ((seed + i * 7) % 900)}`;
+    const due = dueInDays == null ? null : new Date(today.getTime() + dueInDays * 86_400_000).toISOString().slice(0, 10);
+    return { key, summary, status, category, assignee, due, url: `${base}/browse/${key}` };
+  });
+  const jql = buildJql(link) ?? '';
+  return { ok: true, tasks: sortTasks(tasks), total: tasks.length, searchUrl: jiraSearchUrl(base, jql), demo: true };
 }

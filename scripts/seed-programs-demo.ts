@@ -117,7 +117,7 @@ async function main() {
     start: string,
     end: string,
     sessions: SessionPlan[],
-    opts: { location: string; arrival: string; startTime: string; endTime: string; creators: number; what_changed?: string; leaveLastDue?: boolean }
+    opts: { location: string; arrival: string; startTime: string; endTime: string; creators: number; what_changed?: string; leaveLastDue?: boolean; jira_epic?: string }
   ) => {
     const r = await prisma.programRun.create({
       data: {
@@ -133,6 +133,7 @@ async function main() {
         participant_count: opts.creators,
         what_changed: opts.what_changed ?? null,
         notes: `Demo data — safe to delete. ${DEMO_MARK}`,
+        jira_epic: opts.jira_epic ?? null,
       },
     });
     const pastSessions = sessions.filter((s) => isPast(s.date));
@@ -207,6 +208,7 @@ async function main() {
       startTime: '10:00',
       endTime: '14:00',
       creators: 18 + n * 2,
+      jira_epic: `${track === 'game' ? 'GAME' : 'CAD'}-${year - 2000}`,
       what_changed: n === 1 ? 'First summer with Launchpad Philly.' : `Summer #${n}: ${n === 2 ? 'added a family showcase' : 'longer build week, more printers'}.`,
     });
   };
@@ -224,17 +226,17 @@ async function main() {
 
   await run(designClub, '2025–2026', 'Completed', '2025-10-02', '2026-03-26',
     weekly('2025-10-02', 8, ['Welcome back', 'CAD refresh', 'Design brief', 'Prototype', 'Print day', 'Iterate', 'Polish', 'Club showcase'], [[icebreaker, clubKeychain], [phoneStand], [printIterate], [gallery]]),
-    { ...clubOpts, what_changed: 'First year of clubs, after Summer 2025.' });
+    { ...clubOpts, jira_epic: 'CLUB-25', what_changed: 'First year of clubs, after Summer 2025.' });
   await run(geoClub, '2025–2026', 'Completed', '2025-10-01', '2026-03-25',
     weekly('2025-10-01', 8, ['Kickoff', 'Map walk', 'Photogrammetry', 'Model your block', 'Texturing', 'Assemble the map', 'Polish', 'Map showcase'], [[icebreaker, mapWalk], [photogrammetry], [modelBlock], [gallery]]),
-    { ...clubOpts, what_changed: 'First year of clubs, after Summer 2025.' });
+    { ...clubOpts, jira_epic: 'GEO-25', what_changed: 'First year of clubs, after Summer 2025.' });
 
   await run(designClub, '2026–2027', 'Active', '2026-10-01', '2027-03-25',
     weekly('2026-10-01', 12, ['Welcome back', 'CAD refresh', 'Design brief', 'Prototype', 'Print day', 'Iterate'], [[icebreaker, clubKeychain], [phoneStand], [printIterate]]),
-    { ...clubOpts, leaveLastDue: true, what_changed: 'Second year; returning creators mentor new ones.' });
+    { ...clubOpts, leaveLastDue: true, jira_epic: 'CLUB-26', what_changed: 'Second year; returning creators mentor new ones.' });
   await run(geoClub, '2026–2027', 'Active', '2026-09-30', '2027-03-24',
     weekly('2026-09-30', 12, ['Kickoff', 'Map walk', 'Photogrammetry', 'Model your block', 'Texturing', 'Assemble the map'], [[icebreaker, mapWalk], [photogrammetry], [modelBlock]]),
-    { ...clubOpts, leaveLastDue: true, what_changed: 'Second year; mapping a new neighborhood.' });
+    { ...clubOpts, leaveLastDue: true, jira_epic: 'GEO-26', what_changed: 'Second year; mapping a new neighborhood.' });
 
   // The 4th summer, planned with no sessions yet.
   await summer(2027, 'game', 'Planned', false);

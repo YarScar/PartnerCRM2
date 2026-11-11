@@ -29,11 +29,11 @@ export function cleanLabel(v: unknown): string | null | undefined {
   return label;
 }
 
-/** The JQL for a program's tasks, or null when it isn't linked. Open tasks first, then by due date. */
+/** The JQL for a program's tasks, or null when it isn't linked. The app sorts them by status itself. */
 export function buildJql(link: { jira_epic?: string | null; jira_label?: string | null }): string | null {
   const parts: string[] = [];
   if (link.jira_epic && EPIC_KEY.test(link.jira_epic)) parts.push(`parent = ${link.jira_epic}`);
   if (link.jira_label && LABEL.test(link.jira_label)) parts.push(`labels = "${link.jira_label}"`);
   if (parts.length === 0) return null;
-  return `(${parts.join(' OR ')}) ORDER BY statusCategory ASC, duedate ASC, updated DESC`;
+  return `(${parts.join(' OR ')}) ORDER BY duedate ASC, updated DESC`;
 }

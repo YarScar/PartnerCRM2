@@ -30,7 +30,7 @@ describe('Jira links', () => {
 
   it('builds JQL from what is set', () => {
     assert.equal(buildJql({}), null);
-    assert.equal(buildJql({ jira_epic: 'CA-12' }), '(parent = CA-12) ORDER BY statusCategory ASC, duedate ASC, updated DESC');
+    assert.equal(buildJql({ jira_epic: 'CA-12' }), '(parent = CA-12) ORDER BY duedate ASC, updated DESC');
     assert.match(buildJql({ jira_epic: 'CA-12', jira_label: 'geo' })!, /^\(parent = CA-12 OR labels = "geo"\)/);
     assert.equal(buildJql({ jira_epic: 'bad key' }), null, 'unchecked values never reach JQL');
   });
@@ -86,5 +86,21 @@ describe('Jira client', () => {
     assert.equal(seen.auth, `Basic ${Buffer.from('bot@example.org:secret-token').toString('base64')}`);
     await fetchJiraTasks({ jira_label: 'geo-club-2026' }, { env, fetchImpl: counting });
     assert.equal(calls, 1, 'second call within a minute comes from the cache');
+  });
+});
+
+describe('Jira demo mode', () => {
+  it('shows labeled sample tasks only when asked, never on production, never over real settings', async () => {
+    const demo = await fetchJiraTasks({ jira_epic: 'GEO-26' }, { env: { JIRA_DEMO: 'true' } });
+    assert.equal(demo.ok && demo.demo, true);
+    assert.ok(demo.ok && demo.tasks.every((t) => t.key.startsWith('GEO-')));
+    assert.equal(demo.ok && demo.tasks[0].category, 'indeterminate', 'in progress first');
+    assert.equal(demo.ok && demo.tasks.at(-1)?.category, 'done', 'done last');
+    const prod = await fetchJiraTasks({ jira_epic: 'GEO-26' }, { env: { JIRA_DEMO: 'true', VERCEL_ENV: 'production' } });
+    assert.equal(!prod.ok && prod.reason, 'not_configured');
+    const real = await fetchJiraTasks({ jira_epic: 'GEO-27' }, { env: { ...env, JIRA_DEMO: 'true' }, fetchImpl: fakeFetch(200, { issues: [] }) });
+    assert.equal(real.ok && real.demo, undefined);
+    const unlinked = await fetchJiraTasks({}, { env: { JIRA_DEMO: 'true' } });
+    assert.equal(!unlinked.ok && unlinked.reason, 'not_linked');
   });
 });

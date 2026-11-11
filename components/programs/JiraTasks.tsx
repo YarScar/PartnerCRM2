@@ -59,6 +59,11 @@ export async function JiraTasks({
 
   return (
     <div className="space-y-2">
+      {result.demo && (
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+          Demo tasks · not from your Jira
+        </p>
+      )}
       {shown.length === 0 ? (
         <p className="text-sm text-ink/50">{result.tasks.length ? 'All tasks done.' : 'No tasks yet.'}</p>
       ) : (
