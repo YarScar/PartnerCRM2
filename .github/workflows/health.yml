@@ -1,0 +1,32 @@
+name: Production health
+
+# Checks the live site and its database every hour. A failed run makes GitHub email the
+# repository owner, so an outage (e.g. the database becoming unreachable) is noticed
+# within the hour instead of when someone can't log in.
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # Set the repository variable HEALTH_URL to change it (e.g. after moving to a new domain).
+      HEALTH_URL: ${{ vars.HEALTH_URL || 'https://partner-crm-2.vercel.app/api/health' }}
+    steps:
+      - name: Check site and database
+        run: |
+          for attempt in 1 2 3; do
+            body=$(curl -sS --max-time 20 -w '\n%{http_code}' "$HEALTH_URL") || body=$'\n000'
+            code=$(printf '%s' "$body" | tail -n1)
+            echo "Attempt $attempt: HTTP $code $(printf '%s' "$body" | head -n -1)"
+            [ "$code" = "200" ] && exit 0
+            sleep 20
+          done
+          echo "::error::Production health check failed ($HEALTH_URL). If database is 'unreachable', check the Neon project and Vercel's DATABASE_URL."
+          exit 1
