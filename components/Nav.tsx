@@ -30,8 +30,7 @@ export function Nav({ user }: { user: AuthUser | null }) {
     <header className="border-b border-ink/10 bg-cream/80 backdrop-blur-md sticky top-0 z-20">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-full bg-ink flex items-center justify-center
-                          group-hover:bg-court transition-colors">
+          <div className="w-10 h-10 rounded-full bg-ink flex items-center justify-center group-hover:bg-court transition-colors">
             <span className="text-cream font-display font-bold text-lg">C</span>
           </div>
           <div>

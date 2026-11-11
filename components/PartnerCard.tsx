@@ -12,8 +12,7 @@ export function PartnerCard({ partner }: { partner: Partner }) {
   return (
     <Link
       href={`/partners/${partner.id}`}
-      className="group block card hover:border-court/40 hover:shadow-lg hover:-translate-y-0.5
-                 transition-all duration-200"
+      className="group block card hover:border-court/40 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">
