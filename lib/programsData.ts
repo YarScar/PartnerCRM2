@@ -180,6 +180,8 @@ export function getSession(id: number) {
           name: true,
           age_min: true,
           age_max: true,
+          jira_epic: true,
+          jira_label: true,
           program: { select: { id: true, name: true, goals: true } },
           partner: { select: { id: true, org_name: true } },
         },

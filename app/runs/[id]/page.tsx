@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Edit2, Plus } from 'lucide-react';
@@ -8,6 +9,7 @@ import { formatAges, formatDate, isPastRun } from '@/lib/programs';
 import { getRun } from '@/lib/programsData';
 import { ArchiveRunButton } from '@/components/programs/ArchiveRunButton';
 import { DeleteButton } from '@/components/programs/DeleteButton';
+import { JiraTasks, JiraTasksLoading } from '@/components/programs/JiraTasks';
 import { SessionList } from '@/components/programs/SessionList';
 import { Breadcrumbs, Goals, RunStatusBadge, partnerProgramsHref } from '@/components/programs/bits';
 
@@ -61,6 +63,18 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
           Sessions <span className="text-sm font-normal text-ink/50">{run.sessions.length}</span>
         </h2>
         <SessionList sessions={run.sessions} empty="No sessions yet. Add the first one." />
+      </section>
+
+      <section className="card space-y-3">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="font-display text-lg font-bold">Jira tasks</h2>
+          {(run.jira_epic || run.jira_label) && (
+            <span className="text-xs text-ink/50">{[run.jira_epic && `Epic ${run.jira_epic}`, run.jira_label && `Label ${run.jira_label}`].filter(Boolean).join(' · ')}</span>
+          )}
+        </div>
+        <Suspense fallback={<JiraTasksLoading />}>
+          <JiraTasks link={run} editHref={`/runs/${run.id}/edit`} />
+        </Suspense>
       </section>
 
       {hasDetails && (

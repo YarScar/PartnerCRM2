@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Edit2, ExternalLink, Plus } from 'lucide-react';
@@ -10,6 +11,7 @@ import { getSession, listActivityCards } from '@/lib/programsData';
 import { ActivityListEditor } from '@/components/programs/ActivityListEditor';
 import { DebriefForm } from '@/components/programs/DebriefForm';
 import { DeleteButton } from '@/components/programs/DeleteButton';
+import { JiraTasks, JiraTasksLoading } from '@/components/programs/JiraTasks';
 import { DebriefChip } from '@/components/programs/SessionList';
 import { TaskListEditor } from '@/components/programs/TaskListEditor';
 import { storedTasks } from '@/components/programs/sessionValues';
@@ -181,7 +183,13 @@ export default async function SessionPage({
               </div>
             )}
             <div className="card !p-4 space-y-2">
-              <div className="label-base">Tasks</div>
+              <div className="label-base">Jira tasks</div>
+              <Suspense fallback={<JiraTasksLoading />}>
+                <JiraTasks link={run} editHref={`/runs/${run.id}/edit`} compact />
+              </Suspense>
+            </div>
+            <div className="card !p-4 space-y-2">
+              <div className="label-base">Session checklist</div>
               <TaskListEditor value={tasks} saveUrl={`/api/sessions/${session.id}`} />
             </div>
           </aside>

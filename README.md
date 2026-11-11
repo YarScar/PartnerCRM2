@@ -113,6 +113,12 @@ archives it (status Completed); "Reopen program" brings it back. Each session ha
 (attendance, engagement 1–5, what went well, what to improve, changes for next time, highlights,
 follow-ups); a session on or before today without one shows as "Debrief due".
 
+**Jira tasks (read-only):** on a program's Edit page, set its Jira **epic key** (e.g. `CA-12`) or
+**label** (e.g. `geo-club-2026`). The program page lists those tasks (open first), and each session
+shows the open ones; every task links to Jira, where they're still edited. Needs `JIRA_BASE_URL`,
+`JIRA_EMAIL` and `JIRA_API_TOKEN` (see `.env.example`); without them the page links to the search in
+Jira instead. Results are cached for a minute.
+
 **Demo data** (test databases only): `npm run db:seed-programs-demo` adds Launchpad Philly with
 three past summers (Game Dev and 3D Design CAD tracks), last year's 3D Design and 3D Geospatial
 clubs, this year's clubs in progress, and the 4th summer planned. Re-running replaces it;

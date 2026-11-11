@@ -36,6 +36,8 @@ export default async function EditRunPage({ params }: { params: Promise<{ id: st
           participant_count: str(run.participant_count),
           what_changed: run.what_changed ?? '',
           notes: run.notes ?? '',
+          jira_epic: run.jira_epic ?? '',
+          jira_label: run.jira_label ?? '',
         }}
       />
     </div>

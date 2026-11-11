@@ -8,6 +8,8 @@
  * - An Activity can be based on another one (a twist), so the library keeps its family tree.
  */
 
+import { cleanEpicKey, cleanLabel } from './jiraRefs';
+
 export const RUN_STATUSES = ['Planned', 'Active', 'Completed', 'Cancelled'] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];
 
@@ -214,6 +216,8 @@ export type RunData = {
   participant_count?: number | null;
   what_changed?: string | null;
   notes?: string | null;
+  jira_epic?: string | null;
+  jira_label?: string | null;
 };
 
 export function validateRun(input: unknown, { partial = false } = {}): Result<RunData> {
@@ -235,6 +239,8 @@ export function validateRun(input: unknown, { partial = false } = {}): Result<Ru
       ['Participants', () => int(b.participant_count, 0, 100_000)],
       ['What changed', () => text(b.what_changed, MAX_LONG_TEXT)],
       ['Notes', () => text(b.notes, MAX_LONG_TEXT)],
+      ['Jira epic', () => cleanEpicKey(b.jira_epic)],
+      ['Jira label', () => cleanLabel(b.jira_label)],
     ],
     (v) => {
       if (!partial && !v.Program && !v['New program name']) return 'Choose a program or name a new one';
@@ -260,6 +266,8 @@ export function validateRun(input: unknown, { partial = false } = {}): Result<Ru
         participant_count: v.Participants,
         what_changed: v['What changed'],
         notes: v.Notes,
+        jira_epic: v['Jira epic'],
+        jira_label: v['Jira label'],
       });
     }
   );

@@ -19,6 +19,8 @@ export type RunFormValues = {
   participant_count: string;
   what_changed: string;
   notes: string;
+  jira_epic?: string;
+  jira_label?: string;
 };
 
 type Option = { id: number; name: string };
@@ -146,6 +148,26 @@ export function RunForm({
         <label className="label-base" htmlFor="notes">Notes</label>
         <textarea id="notes" className="input-base min-h-[80px]" value={v.notes} onChange={(e) => set({ notes: e.target.value })} placeholder="How it went, what to do next time" />
       </div>
+      <fieldset className="space-y-2">
+        <legend className="label-base">Jira (optional)</legend>
+        <div className="grid md:grid-cols-2 gap-4">
+          <input
+            className="input-base"
+            value={v.jira_epic ?? ''}
+            onChange={(e) => set({ jira_epic: e.target.value })}
+            placeholder="Epic key, e.g. CA-12"
+            aria-label="Jira epic key"
+          />
+          <input
+            className="input-base"
+            value={v.jira_label ?? ''}
+            onChange={(e) => set({ jira_label: e.target.value })}
+            placeholder="or a label, e.g. geo-club-2026"
+            aria-label="Jira label"
+          />
+        </div>
+        <p className="text-xs text-ink/50">The program and its sessions show this epic’s or label’s Jira tasks (read-only).</p>
+      </fieldset>
       {!editing && <p className="text-xs text-ink/50">Add the dated sessions on the next page.</p>}
       {error && <div className="text-sm text-court">{error}</div>}
       <button className="btn-primary" disabled={saving}>

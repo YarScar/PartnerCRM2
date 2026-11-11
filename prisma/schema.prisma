@@ -175,6 +175,9 @@ model ProgramRun {
   participant_count Int?
   what_changed      String?
   notes             String?
+  // Read-only Jira link: the epic key (e.g. CA-12) or label its tasks are grouped by.
+  jira_epic         String?
+  jira_label        String?
   created_at        DateTime  @default(now()) @db.Timestamptz(6)
   updated_at        DateTime  @updatedAt @db.Timestamptz(6)
 
