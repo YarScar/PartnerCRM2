@@ -105,6 +105,14 @@ tests/                     — unit tests (`npm test`)
 
 ## Programs and activities
 
+How it's organized: **Programs → partner (e.g. Launchpad) → their programs → sessions → debrief.**
+`/programs` shows one card per partner; a partner's page (`/programs/partners/[id]`, or `own` for
+programs with no partner) lists debriefs due, current programs, **Add program** (pick from the program
+library or name a new one) and the **Past programs** archive. "Move to past programs" on a program
+archives it (status Completed); "Reopen program" brings it back. Each session has a **debrief**
+(attendance, engagement 1–5, what went well, what to improve, changes for next time, highlights,
+follow-ups); a session on or before today without one shows as "Debrief due".
+
 - **Program** (`/programs`): something offered again and again, with its goals, ages and a usual activity plan.
 - **Run**: one stretch of a program, usually with a partner (e.g. Launchpad → 3D Geospatial Club →
   2026–2027, or a one-day event). `/programs` groups runs by partner under Current and Past; marking a
