@@ -113,6 +113,11 @@ archives it (status Completed); "Reopen program" brings it back. Each session ha
 (attendance, engagement 1–5, what went well, what to improve, changes for next time, highlights,
 follow-ups); a session on or before today without one shows as "Debrief due".
 
+**Demo data** (test databases only): `npm run db:seed-programs-demo` adds Launchpad Philly with
+three past summers (Game Dev and 3D Design CAD tracks), last year's 3D Design and 3D Geospatial
+clubs, this year's clubs in progress, and the 4th summer planned. Re-running replaces it;
+`npm run db:seed-programs-demo -- --remove` takes it out. It refuses to run on Vercel or production.
+
 - **Program** (`/programs`): something offered again and again, with its goals, ages and a usual activity plan.
 - **Run**: one stretch of a program, usually with a partner (e.g. Launchpad → 3D Geospatial Club →
   2026–2027, or a one-day event). `/programs` groups runs by partner under Current and Past; marking a

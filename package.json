@@ -22,7 +22,8 @@
     "db:migrate": "dotenv -e .env.local -e .env -- prisma migrate dev",
     "db:deploy": "dotenv -e .env.local -e .env -- prisma migrate deploy",
     "db:seed": "dotenv -e .env.local -e .env -- tsx db/seed.ts",
-    "users:create": "tsx scripts/create-users.ts"
+    "users:create": "tsx scripts/create-users.ts",
+    "db:seed-programs-demo": "dotenv -e .env.local -e .env -- tsx scripts/seed-programs-demo.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.8.2",
