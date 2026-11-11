@@ -70,15 +70,18 @@ export async function JiraTasks({
         <ul className="divide-y divide-ink/10">
           {shown.map((t) => (
             <li key={t.key}>
-              <a href={t.url} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2 py-2 hover:text-court group">
-                <span className="text-[11px] font-mono text-ink/40 pt-0.5 shrink-0">{t.key}</span>
-                <span className="flex-1 min-w-0">
-                  <span className={`text-sm ${t.category === 'done' ? 'line-through text-ink/40' : ''}`}>{t.summary}</span>
-                  {!compact && (t.assignee || t.due) && (
-                    <span className="block text-xs text-ink/50">{[t.assignee, t.due && `due ${shortDue(t.due)}`].filter(Boolean).join(' · ')}</span>
-                  )}
+              {/* Two lines: the task across the full width, then key · who · due and its status. */}
+              <a href={t.url} target="_blank" rel="noopener noreferrer" className="block py-2.5 hover:text-court">
+                <span className={`block text-sm leading-snug ${t.category === 'done' ? 'line-through text-ink/40' : ''}`}>{t.summary}</span>
+                <span className="mt-1 flex items-center justify-between gap-2">
+                  <span className="text-xs text-ink/50 truncate min-w-0">
+                    <span className="font-mono">{t.key}</span>
+                    {' · '}
+                    {t.assignee ?? 'Unassigned'}
+                    {!compact && t.due && ` · due ${shortDue(t.due)}`}
+                  </span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap shrink-0 ${CATEGORY_STYLE[t.category]}`}>{t.status}</span>
                 </span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0 ${CATEGORY_STYLE[t.category]}`}>{t.status}</span>
               </a>
             </li>
           ))}

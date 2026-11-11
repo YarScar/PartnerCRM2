@@ -154,7 +154,7 @@ export default async function SessionPage({
       </nav>
 
       {tab === 'overview' && (
-        <div className="grid md:grid-cols-[1fr_17rem] gap-6">
+        <div className="grid md:grid-cols-[1fr_17rem] gap-6 items-start">
           <div className="card space-y-5">
             <Block label="Program description">{session.description}</Block>
             <Block label="Audience">{audience}</Block>
